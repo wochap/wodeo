@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/nocturne-53929d40-05df-499c-bc14-17884e999fc5/styles.css">
+<script src="_ds/nocturne-53929d40-05df-499c-bc14-17884e999fc5/_ds_bundle.js"></script>
+<style>body{margin:0;background:var(--color-neutral-900)}a{color:var(--color-accent-300)}a:hover{color:var(--color-accent-200)}</style>
+</helmet>
+<div style="display:flex;flex-direction:column;gap:14px;padding:20px;font-family:var(--font-body);color:var(--color-text)">
+  <div style="display:flex;gap:8px;align-items:center;font-size:13px">Mode
+    <div class="seg"><label class="seg-opt"><input type="radio" name="m" hidden checked="{{ isDark }}" onChange="{{ setDark }}">Mocha</label><label class="seg-opt"><input type="radio" name="m" hidden checked="{{ isLight }}" onChange="{{ setLight }}">Latte</label></div>
+    <span style="font-size:12px;color:var(--color-neutral-400)">Sets data-theme on &lt;html&gt;; both pages below inherit it.</span>
+  </div>
+  <iframe src="Video Trimmer.dc.html" style="width:100%;height:1500px;border:0;border-radius:var(--radius-md);box-shadow:var(--shadow-sm)" ref="{{ f1 }}"></iframe>
+  <iframe src="App Icon.dc.html" style="width:100%;height:620px;border:0;border-radius:var(--radius-md);box-shadow:var(--shadow-sm)" ref="{{ f2 }}"></iframe>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { theme: 'dark' };
+  f1 = React.createRef(); f2 = React.createRef();
+  apply(t) {
+    document.documentElement.setAttribute('data-theme', t);
+    [this.f1, this.f2].forEach(r => { try { r.current?.contentDocument?.documentElement.setAttribute('data-theme', t); } catch (e) {} });
+  }
+  componentDidMount() { this.apply(this.state.theme); [this.f1, this.f2].forEach(r => r.current?.addEventListener('load', () => this.apply(this.state.theme))); }
+  renderVals() {
+    const set = t => () => { this.setState({ theme: t }); this.apply(t); };
+    return { f1: this.f1, f2: this.f2, isDark: this.state.theme === 'dark', isLight: this.state.theme === 'light', setDark: set('dark'), setLight: set('light') };
+  }
+}
+</script>
+</body>
+</html>

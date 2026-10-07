@@ -1,62 +1,87 @@
-/* Nocturne — design-system tokens and component classes. This file is the source of truth for the system's look; retune it here and see readme.md. */
+/* Nocturne (Catppuccin Mocha/Latte) — design-system tokens and component classes. This file is the source of truth for the system's look; retune it here and see readme.md. */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
+/* Catppuccin raw palette — Mocha on :root, Latte under the light blocks
+   below. Every semantic token points at a --ctp-* so flipping the palette
+   flips every screen. */
 :root {
-  --color-bg: #161826;
-  --color-surface: #232532;
-  --color-text: #e9e9ed;
-  --color-accent: #9184d9; /* review round 7 (Barron): the accent moves to
-     the product's blurple — OKLCH hue 289.2, the hue of the app's own Pro
-     accent (#9a8fe0, --om-accent-pro) — at the same lightness the steel
-     accent held (L 0.660, so the documented ratios survive) and chroma
-     in the product blurple's own range (its token sits at C 0.118; the
-     accent takes 0.125, from the old steel's 0.030):
-     the accent now reads as an accent rather than another neutral. */
-  --color-accent-2: #a7a1db; /* the machine-derived stand-in follows: same
-     hue, same L 0.734, chroma at the same 2:3 proportion it held */
-  --color-divider: color-mix(in srgb, #e9e9ed 16%, transparent);
+  color-scheme: dark;
+  --ctp-base: #1e1e2e;
+  --ctp-mantle: #181825;
+  --ctp-crust: #11111b;
+  --ctp-surface0: #313244;
+  --ctp-surface1: #45475a;
+  --ctp-surface2: #585b70;
+  --ctp-overlay0: #6c7086;
+  --ctp-overlay1: #7f849c;
+  --ctp-overlay2: #9399b2;
+  --ctp-subtext0: #a6adc8;
+  --ctp-subtext1: #bac2de;
+  --ctp-text: #cdd6f4;
+  --ctp-lavender: #b4befe;
+  --ctp-mauve: #cba6f7;
+  --ctp-blue: #89b4fa;
+  --ctp-red: #f38ba8;
+  --ctp-green: #a6e3a1;
+  --ctp-yellow: #f9e2af;
+  --ctp-peach: #fab387;
 
-  /* Tonal ramps — generated in OKLCH on one shared lightness scale, so the
-     same step of any role matches the others in visual value. */
-  --color-neutral-100: #f3f5fe;
-  --color-neutral-200: #e4e7f5;
-  --color-neutral-300: #cfd3e5;
-  --color-neutral-400: #b2b6ca;
-  --color-neutral-500: #9397ab;
-  --color-neutral-600: #75798c;
-  --color-neutral-700: #595d6c;
-  --color-neutral-800: #3f424d;
-  --color-neutral-900: #292b31;
+  /* Per-mode knobs the semantic layer reads. */
+  --divider-mix: 16%;
+  --shade-md: rgba(0,0,0,0.55);
+  --shade-lg: rgba(0,0,0,0.65);
+  --neutral-800: var(--ctp-mantle);
+  --neutral-700: var(--ctp-surface1);
+  --neutral-600: var(--ctp-surface2);
+  --neutral-500: var(--ctp-overlay2);  /* text-facing steps sit one step
+  --neutral-400: var(--ctp-subtext0);     farther from the ground than the
+  --neutral-300: var(--ctp-subtext1);     literal ramp so 12px captions on
+  --surface: var(--ctp-surface0);         --color-surface clear 4.5:1 */
 
-  --color-accent-100: #f5f4ff;
-  --color-accent-200: #e7e5fe;
-  --color-accent-300: #d2cefd;
-  --color-accent-400: #b5abfc;
-  --color-accent-500: #968ae0;
-  --color-accent-600: #796cbf;
-  --color-accent-700: #5d5294;
-  --color-accent-800: #423a6a;
-  --color-accent-900: #2b2741;
+  /* Semantic tokens — defined once. */
+  --color-bg: var(--ctp-base);
+  --color-surface: var(--surface);
+  --color-text: var(--ctp-text);
+  --color-accent: var(--ctp-lavender);
+  --color-accent-2: var(--ctp-mauve);
+  --color-divider: color-mix(in srgb, var(--ctp-text) var(--divider-mix), transparent);
 
-  --color-accent-2-100: #f5f4ff;
-  --color-accent-2-200: #e7e5fe;
-  --color-accent-2-300: #d2cefd;
-  --color-accent-2-400: #b5afe8;
-  --color-accent-2-500: #9690c9;
-  --color-accent-2-600: #7972a9;
-  --color-accent-2-700: #5c5783;
-  --color-accent-2-800: #423e5d;
-  --color-accent-2-900: #2b293a;
+  /* Neutral ramp follows the ground: 900 nearest bg, 100 farthest. */
+  --color-neutral-100: var(--ctp-text);
+  --color-neutral-200: var(--ctp-subtext1);
+  --color-neutral-300: var(--neutral-300);
+  --color-neutral-400: var(--neutral-400);
+  --color-neutral-500: var(--neutral-500);
+  --color-neutral-600: var(--neutral-600);
+  --color-neutral-700: var(--neutral-700);
+  --color-neutral-800: var(--neutral-800);
+  --color-neutral-900: var(--ctp-crust);
 
-  /* Deck section-divider ground — review round 3: saturation as presence.
-     Dividers take a saturated deep indigo (hue 277, the neutral ramp's own
-     family; C 0.094 — written when the accent held C 0.030, before the
-     round-7 blurple raised it past the ground's) with a lighter bloom and
-     a ghost tint of the same hue, while the slide grounds stay
-     desaturated. Deck-scale fills only — not interface colors. */
-  --color-section: #262a60;
-  --color-section-glow: #353b80;
-  --color-section-ghost: #4c5397;
+  /* Accent ramp — lavender mixed toward text (100–400) or bg (600–900). */
+  --color-accent-100: color-mix(in oklch, var(--ctp-lavender) 30%, var(--ctp-text));
+  --color-accent-200: color-mix(in oklch, var(--ctp-lavender) 55%, var(--ctp-text));
+  --color-accent-300: color-mix(in oklch, var(--ctp-lavender) 78%, var(--ctp-text));
+  --color-accent-400: color-mix(in oklch, var(--ctp-lavender) 92%, var(--ctp-text));
+  --color-accent-500: var(--ctp-lavender);
+  --color-accent-600: color-mix(in oklch, var(--ctp-lavender) 72%, var(--ctp-base));
+  --color-accent-700: color-mix(in oklch, var(--ctp-lavender) 50%, var(--ctp-base));
+  --color-accent-800: color-mix(in oklch, var(--ctp-lavender) 32%, var(--ctp-base));
+  --color-accent-900: color-mix(in oklch, var(--ctp-lavender) 18%, var(--ctp-base));
+
+  --color-accent-2-100: color-mix(in oklch, var(--ctp-mauve) 30%, var(--ctp-text));
+  --color-accent-2-200: color-mix(in oklch, var(--ctp-mauve) 55%, var(--ctp-text));
+  --color-accent-2-300: color-mix(in oklch, var(--ctp-mauve) 78%, var(--ctp-text));
+  --color-accent-2-400: color-mix(in oklch, var(--ctp-mauve) 92%, var(--ctp-text));
+  --color-accent-2-500: var(--ctp-mauve);
+  --color-accent-2-600: color-mix(in oklch, var(--ctp-mauve) 72%, var(--ctp-base));
+  --color-accent-2-700: color-mix(in oklch, var(--ctp-mauve) 50%, var(--ctp-base));
+  --color-accent-2-800: color-mix(in oklch, var(--ctp-mauve) 32%, var(--ctp-base));
+  --color-accent-2-900: color-mix(in oklch, var(--ctp-mauve) 18%, var(--ctp-base));
+
+  /* Deck section-divider ground — lavender into base. Deck-scale fills only. */
+  --color-section: color-mix(in oklch, var(--ctp-lavender) 28%, var(--ctp-base));
+  --color-section-glow: color-mix(in oklch, var(--ctp-lavender) 42%, var(--ctp-base));
+  --color-section-ghost: color-mix(in oklch, var(--ctp-lavender) 58%, var(--ctp-base));
 
   --font-heading: "Inter", system-ui, sans-serif;
   --font-heading-weight: 500;
@@ -73,11 +98,43 @@
   --radius-md: 8px;
   --radius-lg: 14px;
 
-  /* Elevation — derived from the ground: soft ink-tinted shadows on a
-     light theme, a hairline edge + ambient darkness on a dark one. */
-  --shadow-sm: 0 0 0 1px #3f424d;
-  --shadow-md: 0 0 0 1px #595d6c, 0 6px 18px rgba(0,0,0,0.55);
-  --shadow-lg: 0 0 0 1px #9397ab, 0 16px 40px rgba(0,0,0,0.65);
+  /* Elevation — a hairline ring from the palette plus ambient shade. */
+  --shadow-sm: 0 0 0 1px var(--ctp-surface1);
+  --shadow-md: 0 0 0 1px var(--ctp-surface2), 0 6px 18px var(--shade-md);
+  --shadow-lg: 0 0 0 1px var(--ctp-overlay0), 0 16px 40px var(--shade-lg);
+}
+
+/* Latte — light mode. OS preference applies unless data-theme="dark";
+   data-theme="light" always wins. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --ctp-base: #eff1f5; --ctp-mantle: #e6e9ef; --ctp-crust: #dce0e8;
+    --ctp-surface0: #ccd0da; --ctp-surface1: #bcc0cc; --ctp-surface2: #acb0be;
+    --ctp-overlay0: #9ca0b0; --ctp-overlay1: #8c8fa1; --ctp-overlay2: #7c7f93;
+    --ctp-subtext0: #6c6f85; --ctp-subtext1: #5c5f77; --ctp-text: #4c4f69;
+    --ctp-lavender: #7287fd; --ctp-mauve: #8839ef; --ctp-blue: #1e66f5;
+    --ctp-red: #d20f39; --ctp-green: #40a02b; --ctp-yellow: #df8e1d; --ctp-peach: #fe640b;
+    --divider-mix: 20%;
+    --shade-md: rgba(0,0,0,0.12); --shade-lg: rgba(0,0,0,0.18);
+    --neutral-800: var(--ctp-mantle); --neutral-700: var(--ctp-surface0); --neutral-600: var(--ctp-surface1);
+    --neutral-500: var(--ctp-subtext1); --neutral-400: var(--ctp-text); --neutral-300: var(--ctp-text);
+    --surface: var(--ctp-mantle);
+  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --ctp-base: #eff1f5; --ctp-mantle: #e6e9ef; --ctp-crust: #dce0e8;
+  --ctp-surface0: #ccd0da; --ctp-surface1: #bcc0cc; --ctp-surface2: #acb0be;
+  --ctp-overlay0: #9ca0b0; --ctp-overlay1: #8c8fa1; --ctp-overlay2: #7c7f93;
+  --ctp-subtext0: #6c6f85; --ctp-subtext1: #5c5f77; --ctp-text: #4c4f69;
+  --ctp-lavender: #7287fd; --ctp-mauve: #8839ef; --ctp-blue: #1e66f5;
+  --ctp-red: #d20f39; --ctp-green: #40a02b; --ctp-yellow: #df8e1d; --ctp-peach: #fe640b;
+  --divider-mix: 20%;
+  --shade-md: rgba(0,0,0,0.12); --shade-lg: rgba(0,0,0,0.18);
+  --neutral-800: var(--ctp-mantle); --neutral-700: var(--ctp-surface0); --neutral-600: var(--ctp-surface1);
+  --neutral-500: var(--ctp-subtext1); --neutral-400: var(--ctp-text); --neutral-300: var(--ctp-text);
+  --surface: var(--ctp-mantle);
 }
 
 body {

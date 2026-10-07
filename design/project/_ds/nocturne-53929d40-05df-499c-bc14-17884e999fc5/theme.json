@@ -1,0 +1,103 @@
+{
+  "name": "Nocturne",
+  "palette": "Catppuccin",
+  "modes": {
+    "dark": {
+      "flavor": "Mocha",
+      "default": true
+    },
+    "light": {
+      "flavor": "Latte",
+      "trigger": [
+        "prefers-color-scheme: light",
+        "html[data-theme=\"light\"]"
+      ]
+    }
+  },
+  "mocha": {
+    "base": "#1e1e2e",
+    "mantle": "#181825",
+    "crust": "#11111b",
+    "surface0": "#313244",
+    "surface1": "#45475a",
+    "surface2": "#585b70",
+    "overlay0": "#6c7086",
+    "overlay1": "#7f849c",
+    "overlay2": "#9399b2",
+    "subtext0": "#a6adc8",
+    "subtext1": "#bac2de",
+    "text": "#cdd6f4",
+    "lavender": "#b4befe",
+    "mauve": "#cba6f7",
+    "blue": "#89b4fa",
+    "red": "#f38ba8",
+    "green": "#a6e3a1",
+    "yellow": "#f9e2af",
+    "peach": "#fab387"
+  },
+  "latte": {
+    "base": "#eff1f5",
+    "mantle": "#e6e9ef",
+    "crust": "#dce0e8",
+    "surface0": "#ccd0da",
+    "surface1": "#bcc0cc",
+    "surface2": "#acb0be",
+    "overlay0": "#9ca0b0",
+    "overlay1": "#8c8fa1",
+    "overlay2": "#7c7f93",
+    "subtext0": "#6c6f85",
+    "subtext1": "#5c5f77",
+    "text": "#4c4f69",
+    "lavender": "#7287fd",
+    "mauve": "#8839ef",
+    "blue": "#1e66f5",
+    "red": "#d20f39",
+    "green": "#40a02b",
+    "yellow": "#df8e1d",
+    "peach": "#fe640b"
+  },
+  "semantic": {
+    "bg": "base",
+    "surface": "surface0 (mocha) / mantle (latte)",
+    "text": "text",
+    "accent": "lavender",
+    "accent-2": "mauve",
+    "divider": "text @ 16% (mocha) / 20% (latte)",
+    "neutral": {
+      "100": "text",
+      "200": "subtext1",
+      "300": "subtext1 (mocha) / text (latte)",
+      "400": "subtext0 (mocha) / text (latte)",
+      "500": "overlay2 (mocha) / subtext1 (latte)",
+      "600": "surface2 (mocha) / surface1 (latte)",
+      "700": "surface1 (mocha) / surface0 (latte)",
+      "800": "mantle",
+      "900": "crust"
+    },
+    "accentRamp": "lavender mixed in OKLCH toward text (100–400) and base (600–900)",
+    "section": "lavender into base at 28/42/58%",
+    "shadows": {
+      "rings": [
+        "surface1",
+        "surface2",
+        "overlay0"
+      ],
+      "shade": {
+        "mocha": [
+          0.55,
+          0.65
+        ],
+        "latte": [
+          0.12,
+          0.18
+        ]
+      }
+    }
+  },
+  "type": {
+    "heading": "Inter 500",
+    "body": "Inter"
+  },
+  "density": 0.7,
+  "radius": 8
+}
