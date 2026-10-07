@@ -40,3 +40,6 @@ video-test.mp4
 
 video-trimmer-app-redesign
 openspec-pipeline.sh
+
+design/**/*.png
+design/**/*.webp

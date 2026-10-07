@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/nocturne-53929d40-05df-499c-bc14-17884e999fc5/styles.css">
+<script src="_ds/nocturne-53929d40-05df-499c-bc14-17884e999fc5/_ds_bundle.js"></script>
+</helmet>
+<svg width="{{ size }}" height="{{ size }}" viewBox="0 0 512 512" style="display:block">
+<defs>
+<linearGradient id="ai-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--color-neutral-800)"></stop><stop offset="0.55" style="stop-color:var(--color-surface)"></stop><stop offset="1" style="stop-color:var(--color-bg)"></stop></linearGradient>
+<linearGradient id="ai-frame" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--color-neutral-500)"></stop><stop offset="1" style="stop-color:var(--color-neutral-800)"></stop></linearGradient>
+<linearGradient id="ai-edge" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--color-neutral-500)"></stop><stop offset="1" style="stop-color:var(--color-neutral-900)"></stop></linearGradient>
+<filter id="ai-glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="14"></feGaussianBlur></filter>
+<clipPath id="ai-sq"><rect x="16" y="16" width="480" height="480" rx="112"></rect></clipPath>
+<clipPath id="ai-lens"><circle cx="232" cy="232" r="112"></circle></clipPath>
+</defs>
+<rect x="16" y="16" width="480" height="480" rx="112" fill="url(#ai-bg)"></rect>
+<g clip-path="url(#ai-sq)">
+<sc-if value="{{ isA }}" hint-placeholder-val="{{ true }}">
+  <rect x="0" y="160" width="512" height="192" style="fill:var(--color-neutral-900)"></rect>
+  <g style="fill:var(--color-neutral-700)"><rect x="40" y="168" width="14" height="10" rx="3"></rect><rect x="88" y="168" width="14" height="10" rx="3"></rect><rect x="136" y="168" width="14" height="10" rx="3"></rect><rect x="184" y="168" width="14" height="10" rx="3"></rect><rect x="232" y="168" width="14" height="10" rx="3"></rect><rect x="280" y="168" width="14" height="10" rx="3"></rect><rect x="328" y="168" width="14" height="10" rx="3"></rect><rect x="376" y="168" width="14" height="10" rx="3"></rect><rect x="424" y="168" width="14" height="10" rx="3"></rect><rect x="40" y="334" width="14" height="10" rx="3"></rect><rect x="88" y="334" width="14" height="10" rx="3"></rect><rect x="136" y="334" width="14" height="10" rx="3"></rect><rect x="184" y="334" width="14" height="10" rx="3"></rect><rect x="232" y="334" width="14" height="10" rx="3"></rect><rect x="280" y="334" width="14" height="10" rx="3"></rect><rect x="328" y="334" width="14" height="10" rx="3"></rect><rect x="376" y="334" width="14" height="10" rx="3"></rect><rect x="424" y="334" width="14" height="10" rx="3"></rect></g>
+  <g fill="url(#ai-frame)"><rect x="-12" y="190" width="84" height="132" rx="10"></rect><rect x="84" y="190" width="84" height="132" rx="10"></rect><rect x="180" y="190" width="84" height="132" rx="10"></rect><rect x="276" y="190" width="84" height="132" rx="10"></rect><rect x="372" y="190" width="84" height="132" rx="10"></rect><rect x="468" y="190" width="84" height="132" rx="10"></rect></g>
+  <rect x="0" y="160" width="132" height="192" style="fill:var(--color-bg)" opacity="0.62"></rect>
+  <rect x="380" y="160" width="132" height="192" style="fill:var(--color-bg)" opacity="0.62"></rect>
+  <g filter="url(#ai-glow)" opacity="0.7" style="fill:var(--color-accent)"><rect x="120" y="146" width="272" height="220" rx="16"></rect></g>
+  <rect x="120" y="146" width="272" height="220" rx="16" style="fill:var(--color-accent)"></rect>
+  <rect x="144" y="158" width="224" height="196" rx="6" style="fill:var(--color-neutral-900)"></rect>
+  <g fill="url(#ai-frame)"><rect x="144" y="190" width="24" height="132"></rect><rect x="180" y="190" width="84" height="132" rx="10"></rect><rect x="276" y="190" width="84" height="132" rx="10"></rect></g>
+  <g style="stroke:var(--color-bg)" stroke-width="4" stroke-linecap="round"><path d="M128 236v40M136 236v40M376 236v40M384 236v40"></path></g>
+  <rect x="266" y="112" width="8" height="286" rx="4" style="fill:var(--color-neutral-100)"></rect>
+  <rect x="256" y="98" width="28" height="28" rx="6" transform="rotate(45 270 112)" style="fill:var(--color-neutral-100)"></rect>
+</sc-if>
+<sc-if value="{{ isB }}" hint-placeholder-val="{{ false }}">
+  <g style="stroke:var(--color-neutral-700)" stroke-width="6" stroke-linecap="round"><path d="M96 392v24M128 400v16M160 400v16M192 392v24M224 400v16M256 400v16M288 392v24M320 400v16M352 400v16M384 400v16M416 392v24"></path></g>
+  <g filter="url(#ai-glow)" opacity="0.85" fill="none" style="stroke:var(--color-accent)" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"><path d="M204 124H144V348H204M308 124H368V348H308"></path></g>
+  <path d="M204 124H144V348H204M308 124H368V348H308" fill="none" style="stroke:var(--color-accent)" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M204 124H144V348H204M308 124H368V348H308" fill="none" style="stroke:var(--color-accent-300)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"></path>
+  <rect x="251" y="150" width="10" height="220" rx="5" style="fill:var(--color-neutral-100)"></rect>
+  <circle cx="256" cy="142" r="14" style="fill:var(--color-neutral-100)"></circle>
+</sc-if>
+<sc-if value="{{ isC }}" hint-placeholder-val="{{ false }}">
+  <g style="stroke:var(--color-neutral-600)" stroke-width="6" stroke-linecap="round"><path d="M48 216v32M76 222v20M104 222v20M132 216v32M160 222v20M304 222v20M332 216v32M360 222v20M388 222v20M416 216v32M444 222v20M472 222v20"></path></g>
+  <circle cx="232" cy="232" r="112" style="fill:var(--color-neutral-900)"></circle>
+  <g clip-path="url(#ai-lens)">
+    <g fill="url(#ai-frame)"><rect x="92" y="160" width="84" height="144" rx="10"></rect><rect x="188" y="160" width="84" height="144" rx="10"></rect><rect x="284" y="160" width="84" height="144" rx="10"></rect></g>
+    <rect x="120" y="120" width="112" height="224" style="fill:var(--color-bg)" opacity="0.6"></rect>
+    <g filter="url(#ai-glow)" opacity="0.8" style="fill:var(--color-accent)"><rect x="220" y="140" width="28" height="184" rx="10"></rect></g>
+    <rect x="220" y="140" width="28" height="184" rx="10" style="fill:var(--color-accent)"></rect>
+    <rect x="234" y="140" width="200" height="10" style="fill:var(--color-accent)"></rect>
+    <rect x="234" y="314" width="200" height="10" style="fill:var(--color-accent)"></rect>
+    <g style="stroke:var(--color-bg)" stroke-width="4" stroke-linecap="round"><path d="M230 212v40M238 212v40"></path></g>
+  </g>
+  <circle cx="232" cy="232" r="112" fill="none" style="stroke:var(--color-neutral-200)" stroke-width="18"></circle>
+  <path d="M318 318L402 402" style="stroke:var(--color-neutral-200)" stroke-width="40" stroke-linecap="round"></path>
+</sc-if>
+</g>
+<rect x="17" y="17" width="478" height="478" rx="111" fill="none" stroke="url(#ai-edge)" stroke-width="2" opacity="0.8"></rect>
+</svg>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:256,&quot;height&quot;:256},&quot;variant&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;a&quot;,&quot;b&quot;,&quot;c&quot;],&quot;default&quot;:&quot;a&quot;,&quot;tsType&quot;:&quot;'a'|'b'|'c'&quot;},&quot;size&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:256,&quot;min&quot;:16,&quot;max&quot;:1024,&quot;tsType&quot;:&quot;number&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const v = this.props.variant ?? 'a';
+    return { size: this.props.size ?? 256, isA: v === 'a', isB: v === 'b', isC: v === 'c' };
+  }
+}
+</script>
+</body>
+</html>
