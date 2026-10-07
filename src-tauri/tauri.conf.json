@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "video-trimmer",
+  "productName": "wodeo",
   "version": "0.1.0",
-  "identifier": "com.wochap.video-trimmer",
+  "identifier": "com.wochap.wodeo",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "video-trimmer",
+        "title": "wodeo",
         "width": 1280,
         "height": 800,
         "minWidth": 640,

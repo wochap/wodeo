@@ -1,7 +1,7 @@
 use std::process::{Command, Stdio};
 
 fn binary() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_video-trimmer"))
+    Command::new(env!("CARGO_BIN_EXE_wodeo"))
 }
 
 #[test]
@@ -14,7 +14,7 @@ fn help_version_and_malformed_arguments_finish_before_gui() {
     assert!(version.status.success());
     assert_eq!(
         String::from_utf8_lossy(&version.stdout).trim(),
-        format!("video-trimmer {}", env!("CARGO_PKG_VERSION"))
+        format!("wodeo {}", env!("CARGO_PKG_VERSION"))
     );
     assert!(version.stderr.is_empty());
     let invalid = binary().arg("--unknown").output().unwrap();
@@ -85,7 +85,7 @@ fn invalid_config_file_exits_before_window() {
     // config error is the first failure the binary can hit.
     let _listener =
         std::os::unix::net::UnixListener::bind(dir.path().join("wayland-test")).unwrap();
-    let config = dir.path().join("config/video-trimmer");
+    let config = dir.path().join("config/wodeo");
     std::fs::create_dir_all(&config).unwrap();
     std::fs::write(config.join("config.toml"), "fromat = \"gif\"\n").unwrap();
     let output = binary()

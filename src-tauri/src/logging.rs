@@ -18,9 +18,9 @@ pub fn init(
         .map(PathBuf::from)
         .or_else(|| BaseDirs::new().map(|b| b.home_dir().join(".local/state")))
         .ok_or("cannot resolve state directory")?;
-    let dir = base.join("video-trimmer");
+    let dir = base.join("wodeo");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let app = dir.join("video-trimmer.log");
+    let app = dir.join("wodeo.log");
     let ffmpeg = dir.join("ffmpeg.log");
     remove_stale_traces(&dir);
     let gst = trace_path(&dir, std::process::id());
@@ -29,12 +29,12 @@ pub fn init(
     if verbose {
         std::env::set_var("WEBKIT_DEBUG", "Media")
     }
-    let file = tracing_appender::rolling::never(&dir, "video-trimmer.log");
+    let file = tracing_appender::rolling::never(&dir, "wodeo.log");
     let (non_blocking, guard) = tracing_appender::non_blocking(file);
     let filter = if verbose {
-        "video_trimmer=debug"
+        "wodeo=debug"
     } else {
-        "video_trimmer=info"
+        "wodeo=info"
     };
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(filter))
@@ -125,7 +125,7 @@ mod tests {
             "gstreamer-1.log",
             "gstreamer-2.log",
             "gstreamer.log",
-            "video-trimmer.log",
+            "wodeo.log",
         ] {
             fs::write(dir.path().join(name), "x").unwrap();
         }
@@ -138,7 +138,7 @@ mod tests {
         left.sort();
         assert_eq!(
             left,
-            ["gstreamer-1.log", "gstreamer.log", "video-trimmer.log"]
+            ["gstreamer-1.log", "gstreamer.log", "wodeo.log"]
         )
     }
     #[test]
@@ -148,7 +148,7 @@ mod tests {
         fs::write(&gst, "x").unwrap();
         let paths = LogPaths {
             state_dir: dir.path().into(),
-            application: dir.path().join("video-trimmer.log"),
+            application: dir.path().join("wodeo.log"),
             ffmpeg: dir.path().join("ffmpeg.log"),
             gstreamer: gst.clone(),
             verbose: false,

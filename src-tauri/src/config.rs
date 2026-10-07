@@ -66,7 +66,7 @@ fn path_from(xdg: Option<OsString>, home: Option<PathBuf>) -> Option<PathBuf> {
     xdg.filter(|v| !v.is_empty())
         .map(PathBuf::from)
         .or_else(|| home.map(|h| h.join(".config")))
-        .map(|base| base.join("video-trimmer").join("config.toml"))
+        .map(|base| base.join("wodeo").join("config.toml"))
 }
 pub fn path() -> Option<PathBuf> {
     path_from(
@@ -124,7 +124,7 @@ mod tests {
     use super::*;
     use clap::Parser;
     fn cli(args: &[&str]) -> Cli {
-        Cli::try_parse_from(std::iter::once("video-trimmer").chain(args.iter().copied())).unwrap()
+        Cli::try_parse_from(std::iter::once("wodeo").chain(args.iter().copied())).unwrap()
     }
     fn file(text: &str) -> FileConfig {
         toml::from_str(text).unwrap()
@@ -133,15 +133,15 @@ mod tests {
     fn path_prefers_xdg_then_home_config() {
         assert_eq!(
             path_from(Some("/x".into()), Some("/home/u".into())).unwrap(),
-            PathBuf::from("/x/video-trimmer/config.toml")
+            PathBuf::from("/x/wodeo/config.toml")
         );
         assert_eq!(
             path_from(None, Some("/home/u".into())).unwrap(),
-            PathBuf::from("/home/u/.config/video-trimmer/config.toml")
+            PathBuf::from("/home/u/.config/wodeo/config.toml")
         );
         assert_eq!(
             path_from(Some("".into()), Some("/home/u".into())).unwrap(),
-            PathBuf::from("/home/u/.config/video-trimmer/config.toml")
+            PathBuf::from("/home/u/.config/wodeo/config.toml")
         );
     }
     #[test]
@@ -150,7 +150,7 @@ mod tests {
         let old = std::env::var_os("XDG_CONFIG_HOME");
         std::env::set_var("XDG_CONFIG_HOME", dir.path());
         assert_eq!(load().unwrap(), FileConfig::default());
-        let conf = dir.path().join("video-trimmer");
+        let conf = dir.path().join("wodeo");
         fs::create_dir_all(&conf).unwrap();
         fs::write(conf.join("config.toml"), "format = \"gif\"\n").unwrap();
         let loaded = load();

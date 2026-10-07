@@ -44,7 +44,7 @@ export function Header({
       ) : (
         <>
           <h1 className="text-sm font-medium whitespace-nowrap">
-            Video Trimmer
+            Wodeo
           </h1>
           <p className="text-xs whitespace-nowrap text-neutral-500">
             No video open

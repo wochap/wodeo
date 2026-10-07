@@ -47,7 +47,7 @@ The system SHALL make `--verbose` retain detailed application, FFmpeg stderr, an
 
 #### Scenario: Verbose mode enabled
 - **WHEN** the application starts with `--verbose`
-- **THEN** it configures media diagnostics before WebKitGTK initializes and records detailed logs in the video-trimmer state directory
+- **THEN** it configures media diagnostics before WebKitGTK initializes and records detailed logs in the wodeo state directory
 
 #### Scenario: Verbose mode disabled
 - **WHEN** the application starts normally
@@ -73,7 +73,7 @@ The system SHALL classify known GStreamer hardware and software decoder factorie
 - **THEN** the application logs its name, reports acceleration as unknown, and continues playback
 
 ### Requirement: Log destinations and stream isolation
-The system SHALL write application logs beneath `$XDG_STATE_HOME/video-trimmer` or the platform-equivalent fallback and MUST direct all application, FFmpeg, and GStreamer diagnostics away from stdout.
+The system SHALL write application logs beneath `$XDG_STATE_HOME/wodeo` or the platform-equivalent fallback and MUST direct all application, FFmpeg, and GStreamer diagnostics away from stdout.
 
 #### Scenario: State home is not explicitly set
 - **WHEN** `XDG_STATE_HOME` is absent

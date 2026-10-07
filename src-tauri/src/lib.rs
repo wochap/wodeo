@@ -14,7 +14,7 @@ use tauri::{Manager, RunEvent};
 fn validate_wayland() -> Result<String, String> {
     std::env::set_var("GDK_BACKEND", "wayland");
     let display = std::env::var("WAYLAND_DISPLAY").map_err(|_| {
-        "WAYLAND_DISPLAY is not set; video-trimmer requires a native Wayland session".to_string()
+        "WAYLAND_DISPLAY is not set; wodeo requires a native Wayland session".to_string()
     })?;
     let socket =
         if PathBuf::from(&display).is_absolute() {
@@ -35,14 +35,14 @@ pub fn run() {
     let wayland_name = match validate_wayland() {
         Ok(v) => v,
         Err(e) => {
-            eprintln!("video-trimmer: {e}");
+            eprintln!("wodeo: {e}");
             std::process::exit(lifecycle::EXIT_STARTUP)
         }
     };
     let file_config = match config::load() {
         Ok(v) => v,
         Err(e) => {
-            eprintln!("video-trimmer: {e}");
+            eprintln!("wodeo: {e}");
             std::process::exit(lifecycle::EXIT_STARTUP)
         }
     };
@@ -50,7 +50,7 @@ pub fn run() {
     let (log_paths, guard) = match logging::init(cli.verbose) {
         Ok(v) => v,
         Err(e) => {
-            eprintln!("video-trimmer: logging initialization failed: {e}");
+            eprintln!("wodeo: logging initialization failed: {e}");
             std::process::exit(lifecycle::EXIT_STARTUP)
         }
     };
@@ -78,7 +78,7 @@ pub fn run() {
         .setup(|app| {
             let server =
                 preview_server::PreviewServer::start(app.handle().clone()).unwrap_or_else(|e| {
-                    eprintln!("video-trimmer: preview server failed to start: {e}");
+                    eprintln!("wodeo: preview server failed to start: {e}");
                     std::process::exit(lifecycle::EXIT_STARTUP)
                 });
             app.manage(server);
@@ -94,7 +94,7 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|e| {
-            eprintln!("video-trimmer: application initialization failed: {e}");
+            eprintln!("wodeo: application initialization failed: {e}");
             std::process::exit(lifecycle::EXIT_STARTUP)
         });
     app.run(|handle, event| {

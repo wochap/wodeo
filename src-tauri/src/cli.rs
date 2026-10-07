@@ -4,7 +4,7 @@ use serde::Serialize;
 use std::path::PathBuf;
 #[derive(Debug, Clone, Parser)]
 #[command(
-    name = "video-trimmer",
+    name = "wodeo",
     version,
     about = "Trim one MP4 precisely in a minimal Wayland UI"
 )]
@@ -50,7 +50,7 @@ mod tests {
     #[test]
     fn parses_all_options() {
         let c = Cli::try_parse_from([
-            "video-trimmer",
+            "wodeo",
             "in.mp4",
             "-o",
             "out.webm",
@@ -69,25 +69,25 @@ mod tests {
         assert_eq!(c.on_done, Some(OnDone::Stay));
         assert!(c.verbose);
         for format in ["mp4", "webm", "gif", "copy"] {
-            assert!(Cli::try_parse_from(["video-trimmer", "--format", format]).is_ok());
+            assert!(Cli::try_parse_from(["wodeo", "--format", format]).is_ok());
         }
         for quality in ["original", "high", "small"] {
-            assert!(Cli::try_parse_from(["video-trimmer", "--quality", quality]).is_ok());
+            assert!(Cli::try_parse_from(["wodeo", "--quality", quality]).is_ok());
         }
     }
     #[test]
     fn rejects_unknown_invalid_values_force_and_extra_input() {
-        assert!(Cli::try_parse_from(["video-trimmer", "--wat"]).is_err());
-        assert!(Cli::try_parse_from(["video-trimmer", "a.mp4", "b.mp4"]).is_err());
-        assert!(Cli::try_parse_from(["video-trimmer", "--format", "avi"]).is_err());
-        assert!(Cli::try_parse_from(["video-trimmer", "--quality", "ultra"]).is_err());
-        assert!(Cli::try_parse_from(["video-trimmer", "--on-done", "later"]).is_err());
-        assert!(Cli::try_parse_from(["video-trimmer", "--force"]).is_err());
-        assert!(Cli::try_parse_from(["video-trimmer", "-f"]).is_err());
+        assert!(Cli::try_parse_from(["wodeo", "--wat"]).is_err());
+        assert!(Cli::try_parse_from(["wodeo", "a.mp4", "b.mp4"]).is_err());
+        assert!(Cli::try_parse_from(["wodeo", "--format", "avi"]).is_err());
+        assert!(Cli::try_parse_from(["wodeo", "--quality", "ultra"]).is_err());
+        assert!(Cli::try_parse_from(["wodeo", "--on-done", "later"]).is_err());
+        assert!(Cli::try_parse_from(["wodeo", "--force"]).is_err());
+        assert!(Cli::try_parse_from(["wodeo", "-f"]).is_err());
     }
     #[test]
     fn launch_options_serialize_effective_values() {
-        let c = Cli::try_parse_from(["video-trimmer", "--on-done", "stay"]).unwrap();
+        let c = Cli::try_parse_from(["wodeo", "--on-done", "stay"]).unwrap();
         let effective = crate::config::resolve(&c, &Default::default());
         let json = serde_json::to_value(LaunchOptions::new(c, effective)).unwrap();
         assert_eq!(json["format"], "mp4");

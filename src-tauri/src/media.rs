@@ -396,7 +396,7 @@ pub struct Inspected {
     pub thumbnails: Vec<PathBuf>,
 }
 fn cache_dir(load_id: u64) -> PathBuf {
-    ProjectDirs::from("com", "wochap", "video-trimmer")
+    ProjectDirs::from("com", "wochap", "wodeo")
         .map(|p| p.cache_dir().to_path_buf())
         .unwrap_or_else(std::env::temp_dir)
         .join(format!("preview-{}-{load_id}", std::process::id()))

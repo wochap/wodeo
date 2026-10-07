@@ -645,7 +645,7 @@ async fn run_export(
     let input = media::validate_input(Path::new(&request.input))?;
     let output = destination(&input, Path::new(&request.output), format)?;
     let temp = tempfile::Builder::new()
-        .prefix(".video-trimmer-")
+        .prefix(".wodeo-")
         .suffix(&format!(".{}", format.extension()))
         .tempfile_in(output.parent().unwrap())
         .map_err(|e| AppError::Destination(e.to_string()))?;

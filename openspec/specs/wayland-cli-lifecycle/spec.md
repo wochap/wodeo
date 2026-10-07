@@ -24,7 +24,7 @@ The system SHALL create one resizable main window without server-side or client-
 - **THEN** the video workspace occupies an undecorated window whose application-level exit action is `Cancel`
 
 ### Requirement: CLI input and output options
-The executable SHALL accept `video-trimmer [INPUT]`, `-o|--output <PATH>`, `--format <mp4|webm|gif|copy>`, `--quality <original|high|small>`, `--on-done <exit|stay>`, `-v|--verbose`, `-h|--help`, and `-V|--version` and SHALL reject unknown or malformed arguments before opening the window.
+The executable SHALL accept `wodeo [INPUT]`, `-o|--output <PATH>`, `--format <mp4|webm|gif|copy>`, `--quality <original|high|small>`, `--on-done <exit|stay>`, `-v|--verbose`, `-h|--help`, and `-V|--version` and SHALL reject unknown or malformed arguments before opening the window.
 
 #### Scenario: Input argument supplied
 - **WHEN** the user launches with one valid positional input path
@@ -58,7 +58,7 @@ The executable SHALL accept `video-trimmer [INPUT]`, `-o|--output <PATH>`, `--fo
 The system SHALL keep each invocation attached to the window and export it started and SHALL NOT forward arguments or completion to a pre-existing single-instance process.
 
 #### Scenario: Launch while another instance is running
-- **WHEN** the executable is invoked while another video-trimmer process exists
+- **WHEN** the executable is invoked while another wodeo process exists
 - **THEN** the new process opens its own window and retains its own stdout, stderr, and exit status
 
 ### Requirement: CLI stream and exit semantics

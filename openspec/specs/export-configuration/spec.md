@@ -6,7 +6,7 @@ Define the user configuration file that stores default export options and how th
 ## Requirements
 
 ### Requirement: Configuration file location
-The system SHALL read defaults from `$XDG_CONFIG_HOME/video-trimmer/config.toml`, falling back to `~/.config/video-trimmer/config.toml` when `XDG_CONFIG_HOME` is unset, and SHALL treat a missing file as an empty configuration.
+The system SHALL read defaults from `$XDG_CONFIG_HOME/wodeo/config.toml`, falling back to `~/.config/wodeo/config.toml` when `XDG_CONFIG_HOME` is unset, and SHALL treat a missing file as an empty configuration.
 
 #### Scenario: No configuration file
 - **WHEN** neither path exists
@@ -14,7 +14,7 @@ The system SHALL read defaults from `$XDG_CONFIG_HOME/video-trimmer/config.toml`
 
 #### Scenario: XDG override
 - **WHEN** `XDG_CONFIG_HOME` is set
-- **THEN** the application reads only `$XDG_CONFIG_HOME/video-trimmer/config.toml`
+- **THEN** the application reads only `$XDG_CONFIG_HOME/wodeo/config.toml`
 
 ### Requirement: Configuration schema
 The configuration file SHALL accept the optional keys `format` (`mp4`, `webm`, `gif`, `copy`), `quality` (`original`, `high`, `small`), and `on_done` (`exit`, `stay`). Built-in defaults are `mp4`, `original`, and `exit`.

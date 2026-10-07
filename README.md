@@ -1,4 +1,4 @@
-# video-trimmer
+# wodeo
 
 <img width="1231" height="833" alt="grim_Screenshot_2026-09-23_09-42-18" src="https://github.com/user-attachments/assets/cfec390d-1414-4dc3-9e63-e7d1b21c21b2" />
 
@@ -19,26 +19,26 @@ A minimal Wayland-only MP4 trimmer for Hyprland. Select an in/out range, preview
 Requires an x86_64 Linux system running native Wayland and [Nix](https://nixos.org/) with flakes enabled.
 
 ```sh
-nix profile install github:wochap/video-trimmer
+nix profile install github:wochap/wodeo
 ```
 
 Run without installing:
 
 ```sh
-nix run github:wochap/video-trimmer -- video.mp4
+nix run github:wochap/wodeo -- video.mp4
 ```
 
 ## Usage
 
 ```sh
-video-trimmer [INPUT] [-o PATH] [--format FORMAT] [--quality QUALITY] [--on-done POLICY] [-v]
+wodeo [INPUT] [-o PATH] [--format FORMAT] [--quality QUALITY] [--on-done POLICY] [-v]
 ```
 
 ```sh
-video-trimmer recording.mp4
-video-trimmer recording.mp4 -o clip.mp4
-video-trimmer recording.mp4 -o clip.gif --quality small
-video-trimmer recording.mp4 --format copy --on-done stay
+wodeo recording.mp4
+wodeo recording.mp4 -o clip.mp4
+wodeo recording.mp4 -o clip.gif --quality small
+wodeo recording.mp4 --format copy --on-done stay
 ```
 
 Options:
@@ -53,7 +53,7 @@ Options:
 
 ### Config file
 
-Defaults are read from `$XDG_CONFIG_HOME/video-trimmer/config.toml` (or `~/.config/video-trimmer/config.toml`). Every key is optional:
+Defaults are read from `$XDG_CONFIG_HOME/wodeo/config.toml` (or `~/.config/wodeo/config.toml`). Every key is optional:
 
 ```toml
 # mp4 | webm | gif | copy
@@ -79,8 +79,8 @@ Useful controls:
 ## Development
 
 ```sh
-git clone https://github.com/wochap/video-trimmer.git
-cd video-trimmer
+git clone https://github.com/wochap/wodeo.git
+cd wodeo
 nix develop
 npm ci
 npm run tauri -- dev -- [INPUT]
@@ -106,7 +106,7 @@ nix build
 
 Only local MP4 input files and one continuous time range are supported. Re-encoded exports may normalize unusual formats for compatibility. The app requires native Wayland and does not fall back to X11/XWayland.
 
-On success, stdout contains only the absolute output path. Logs are written to stderr and `$XDG_STATE_HOME/video-trimmer` (usually `~/.local/state/video-trimmer`). See [docs/verification.md](docs/verification.md) for supported media scenarios.
+On success, stdout contains only the absolute output path. Logs are written to stderr and `$XDG_STATE_HOME/wodeo` (usually `~/.local/state/wodeo`). See [docs/verification.md](docs/verification.md) for supported media scenarios.
 
 ## License
 
