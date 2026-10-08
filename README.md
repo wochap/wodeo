@@ -28,10 +28,34 @@ Run without installing:
 nix run github:wochap/wodeo -- video.mp4
 ```
 
+The package installs a zsh completion. To build without it, override the package:
+
+```nix
+wodeo.packages.x86_64-linux.default.override { withShellCompletions = false; }
+```
+
+### Shell completions
+
+The Nix package puts `_wodeo` in `share/zsh/site-functions`, which zsh picks up through `fpath` when the profile is on it. Otherwise, use one of:
+
+```sh
+# Write the script to a directory on fpath (before compinit)
+wodeo --completions zsh > ~/.zfunc/_wodeo
+
+# Load it at shell startup (after compinit)
+eval "$(wodeo --completions zsh)"
+
+# Same, deferred with zsh-defer
+zsh-defer eval "$(wodeo --completions zsh)"
+```
+
+`--completions` prints the script and exits without checking for Wayland, so it works in any terminal. Only `zsh` is supported.
+
 ## Usage
 
 ```sh
 wodeo [INPUT] [-o PATH] [--format FORMAT] [--quality QUALITY] [--on-done POLICY] [-v]
+wodeo --completions zsh
 ```
 
 ```sh
@@ -48,6 +72,7 @@ Options:
 - `--quality original|high|small` — `original` (default) keeps the source resolution. `high` fits video inside 1920x1080 and `small` inside 1280x720 (portrait sources use the rotated box); sources are never upscaled. For GIF, `high` caps width at 720 and `small` at 480, at 12 and 10 fps (15 fps for `original`). `copy` ignores quality.
 - `--on-done exit|stay` — `exit` (default) closes the app after a successful trim. `stay` returns to the editor so you can trim again; each successful trim prints its path on its own stdout line, and the app exits with status 0 when closed.
 - `-v, --verbose` — detailed media logs.
+- `--completions zsh` — print the zsh completion script and exit.
 
 `-f/--force` was removed: the destination is always shown before trimming, so existing files are replaced.
 

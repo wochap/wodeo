@@ -71,11 +71,12 @@ struct Format {
     format_name: Option<String>,
     bit_rate: Option<String>,
 }
+pub const INPUT_EXTENSIONS: &[&str] = &["mp4"];
 pub fn validate_input(raw: &Path) -> Result<PathBuf, AppError> {
     if raw
         .extension()
         .and_then(|v| v.to_str())
-        .is_none_or(|v| !v.eq_ignore_ascii_case("mp4"))
+        .is_none_or(|v| !INPUT_EXTENSIONS.iter().any(|e| v.eq_ignore_ascii_case(e)))
     {
         return Err(AppError::UnsupportedInput(raw.display().to_string()));
     }

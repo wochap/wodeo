@@ -1,5 +1,5 @@
 use crate::config::{Effective, Format, OnDone, Quality};
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use serde::Serialize;
 use std::path::PathBuf;
 #[derive(Debug, Clone, Parser)]
@@ -21,6 +21,21 @@ pub struct Cli {
     pub on_done: Option<OnDone>,
     #[arg(short, long)]
     pub verbose: bool,
+    /// Print a shell completion script and exit
+    #[arg(long, value_enum, value_name = "SHELL")]
+    pub completions: Option<Shell>,
+}
+pub const COMPLETION_ZSH: &str = include_str!("../completions/_wodeo");
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum Shell {
+    Zsh,
+}
+impl Shell {
+    pub fn script(self) -> &'static str {
+        match self {
+            Shell::Zsh => COMPLETION_ZSH,
+        }
+    }
 }
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -94,5 +109,39 @@ mod tests {
         assert_eq!(json["quality"], "original");
         assert_eq!(json["onDone"], "stay");
         assert!(json.get("force").is_none());
+    }
+    #[test]
+    fn completions_flag_accepts_zsh_only() {
+        let c = Cli::try_parse_from(["wodeo", "--completions", "zsh"]).unwrap();
+        assert_eq!(c.completions, Some(Shell::Zsh));
+        let err = Cli::try_parse_from(["wodeo", "--completions", "fish"]).unwrap_err();
+        assert_eq!(err.kind(), clap::error::ErrorKind::InvalidValue);
+    }
+    #[test]
+    fn zsh_script_shape() {
+        assert!(COMPLETION_ZSH.starts_with("#compdef wodeo"));
+        assert!(COMPLETION_ZSH.contains("compdef _wodeo wodeo"));
+    }
+    #[test]
+    fn zsh_script_mentions_every_flag() {
+        use clap::CommandFactory;
+        for arg in Cli::command().get_arguments() {
+            if let Some(long) = arg.get_long() {
+                let flag = format!("--{long}");
+                assert!(COMPLETION_ZSH.contains(&flag), "_wodeo is missing {flag}");
+            }
+            if let Some(short) = arg.get_short() {
+                let flag = format!("-{short}");
+                assert!(COMPLETION_ZSH.contains(&flag), "_wodeo is missing {flag}");
+            }
+        }
+    }
+    #[test]
+    fn zsh_input_glob_matches_allowlist() {
+        let glob = format!("*.(#i)({})(-.)", crate::media::INPUT_EXTENSIONS.join("|"));
+        assert!(
+            COMPLETION_ZSH.contains(&glob),
+            "_wodeo input glob must be {glob}"
+        );
     }
 }

@@ -24,6 +24,18 @@ fn help_version_and_malformed_arguments_finish_before_gui() {
 }
 
 #[test]
+fn zsh_completions_print_without_wayland() {
+    let output = binary()
+        .env_remove("WAYLAND_DISPLAY")
+        .args(["--completions", "zsh"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&output.stdout).starts_with("#compdef wodeo"));
+    assert!(output.stderr.is_empty());
+}
+
+#[test]
 fn unavailable_wayland_is_nonzero_and_stdout_clean() {
     let output = binary()
         .env_remove("WAYLAND_DISPLAY")

@@ -32,6 +32,10 @@ fn validate_wayland() -> Result<String, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let cli = cli::Cli::parse();
+    if let Some(shell) = cli.completions {
+        print!("{}", shell.script());
+        std::process::exit(0);
+    }
     let wayland_name = match validate_wayland() {
         Ok(v) => v,
         Err(e) => {

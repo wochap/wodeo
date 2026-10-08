@@ -1,0 +1,27 @@
+#compdef wodeo
+
+_wodeo() {
+  local -a args
+  args=(
+    '(-h --help)'{-h,--help}'[print help]'
+    '(-V --version)'{-V,--version}'[print version]'
+    '(-o --output)'{-o+,--output=}'[preselect the output PATH]:path:_files'
+    '--format=[output format (overrides config)]:format:((mp4\:"MP4 (re-encode)" webm\:"WebM" gif\:"animated GIF" copy\:"stream copy (no re-encode)"))'
+    '--quality=[encoding quality (overrides config)]:quality:((original\:"match the source" high\:"high quality" small\:"smaller file"))'
+    '--on-done=[what a successful export does next]:action:((exit\:"exit after exporting" stay\:"keep the editor open"))'
+    '(-v --verbose)'{-v,--verbose}'[verbose logging]'
+    '--completions=[print a shell completion script]:shell:((zsh\:"zsh completion script"))'
+    '1:video:_wodeo_input'
+  )
+  _arguments -s -S $args
+}
+
+_wodeo_input() {
+  _files -g "*.(#i)(mp4)(-.)"
+}
+
+if [[ $zsh_eval_context[-1] == loadautofunc ]]; then
+  _wodeo "$@"
+else
+  compdef _wodeo wodeo
+fi
