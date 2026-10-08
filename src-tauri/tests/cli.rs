@@ -8,7 +8,7 @@ fn binary() -> Command {
 fn help_version_and_malformed_arguments_finish_before_gui() {
     let help = binary().arg("--help").output().unwrap();
     assert!(help.status.success());
-    assert!(String::from_utf8_lossy(&help.stdout).contains("Trim one MP4"));
+    assert!(String::from_utf8_lossy(&help.stdout).contains("Trim one video"));
     assert!(help.stderr.is_empty());
     let version = binary().arg("--version").output().unwrap();
     assert!(version.status.success());

@@ -71,7 +71,7 @@ struct Format {
     format_name: Option<String>,
     bit_rate: Option<String>,
 }
-pub const INPUT_EXTENSIONS: &[&str] = &["mp4"];
+pub const INPUT_EXTENSIONS: &[&str] = &["mp4", "m4v", "mov", "mkv", "webm"];
 pub fn validate_input(raw: &Path) -> Result<PathBuf, AppError> {
     if raw
         .extension()
@@ -104,7 +104,7 @@ fn parse_rate(s: Option<&str>) -> f64 {
 }
 #[cfg(test)]
 pub fn probe(path: &Path) -> Result<VideoMetadata, AppError> {
-    let mut metadata = inspect(path, true)?;
+    let mut metadata = inspect(path, Some(path))?;
     metadata.keyframes_micros = keyframes(path).unwrap_or_else(|e| {
         tracing::warn!(path = %path.display(), reason = %e, "keyframe index unavailable");
         vec![]
@@ -113,7 +113,7 @@ pub fn probe(path: &Path) -> Result<VideoMetadata, AppError> {
 }
 // Validates any container FFmpeg can read, for non-MP4 export outputs.
 pub fn probe_any(path: &Path) -> Result<VideoMetadata, AppError> {
-    inspect(path, false)
+    inspect(path, None)
 }
 // Reads packet flags instead of decoding frames, so indexing stays cheap on
 // long files. Timestamps come back ascending and deduplicated.
@@ -158,7 +158,18 @@ pub fn keyframe_at_or_before(keyframes: &[u64], start: u64) -> Option<u64> {
         index => Some(keyframes[index - 1]),
     }
 }
-fn inspect(path: &Path, require_mp4: bool) -> Result<VideoMetadata, AppError> {
+// ffprobe family name required for a supported input extension: every
+// ISO-BMFF file reports `mov,...`, every Matroska/WebM file `matroska,webm`.
+fn container_family(path: &Path) -> Option<&'static str> {
+    match path.extension()?.to_str()?.to_ascii_lowercase().as_str() {
+        "mp4" | "m4v" | "mov" => Some("mov"),
+        "mkv" | "webm" => Some("matroska"),
+        _ => None,
+    }
+}
+// `require_supported` names the input whose extension must agree with the
+// probed container family; `None` accepts any container with video.
+fn inspect(path: &Path, require_supported: Option<&Path>) -> Result<VideoMetadata, AppError> {
     let out = Command::new("ffprobe")
         .args([
             "-v",
@@ -178,16 +189,20 @@ fn inspect(path: &Path, require_mp4: bool) -> Result<VideoMetadata, AppError> {
     }
     let p: Probe = serde_json::from_slice(&out.stdout)
         .map_err(|e| AppError::Probe(format!("invalid ffprobe JSON: {e}")))?;
-    if require_mp4
-        && !p
-            .format
-            .format_name
-            .as_deref()
-            .unwrap_or("")
-            .split(',')
-            .any(|v| v == "mov" || v == "mp4")
-    {
-        return Err(AppError::Probe("container is not recognized as MP4".into()));
+    if let Some(input) = require_supported {
+        let family = container_family(input);
+        if !family.is_some_and(|family| {
+            p.format
+                .format_name
+                .as_deref()
+                .unwrap_or("")
+                .split(',')
+                .any(|v| v == family)
+        }) {
+            return Err(AppError::Probe(
+                "container is not a supported video container".into(),
+            ));
+        }
     }
     let v = p
         .streams
@@ -419,7 +434,7 @@ pub fn inspect_input(
         }))
     };
     progress(STEP_CONTAINER, 0.0);
-    let mut metadata = inspect(canonical, true)?;
+    let mut metadata = inspect(canonical, Some(canonical))?;
     progress(STEP_KEYFRAMES, 0.1);
     metadata.keyframes_micros = keyframes(canonical).unwrap_or_else(|e| {
         tracing::warn!(path = %canonical.display(), reason = %e, "keyframe index unavailable");
@@ -522,9 +537,88 @@ mod tests {
     #[test]
     fn validates_extension_before_probe() {
         assert!(matches!(
-            validate_input(Path::new("x.mov")),
+            validate_input(Path::new("x.avi")),
             Err(AppError::UnsupportedInput(_))
-        ))
+        ));
+        assert!(matches!(
+            validate_input(Path::new("x.ts")),
+            Err(AppError::UnsupportedInput(_))
+        ));
+        // Supported extensions pass the extension gate and fail on existence.
+        for name in ["x.mp4", "x.M4V", "x.mov", "x.MKV", "x.webm"] {
+            assert!(matches!(
+                validate_input(Path::new(name)),
+                Err(AppError::MissingInput(_))
+            ));
+        }
+    }
+    fn generate(path: &Path, codec: &[&str]) {
+        let status = Command::new("ffmpeg")
+            .args([
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "testsrc2=s=320x240:r=30:d=4",
+                "-an",
+                "-g",
+                "60",
+            ])
+            .args(codec)
+            .arg("-y")
+            .arg(path)
+            .status()
+            .unwrap();
+        assert!(status.success(), "failed to generate {}", path.display());
+    }
+    #[test]
+    fn matroska_and_webm_inputs_probe_index_and_proxy() {
+        let dir = tempfile::tempdir().unwrap();
+        let mkv = dir.path().join("clip.mkv");
+        let webm = dir.path().join("clip.webm");
+        generate(&mkv, &["-c:v", "libx264", "-pix_fmt", "yuv420p"]);
+        generate(
+            &webm,
+            &[
+                "-c:v",
+                "libvpx-vp9",
+                "-deadline",
+                "realtime",
+                "-cpu-used",
+                "8",
+            ],
+        );
+        for (path, codec) in [(&mkv, "h264"), (&webm, "vp9")] {
+            let metadata = probe(path).unwrap();
+            assert_eq!(metadata.codec, codec);
+            assert_eq!((metadata.width, metadata.height), (320, 240));
+            assert!(metadata.keyframes_micros.len() >= 2, "{path:?}");
+            assert_eq!(metadata.keyframes_micros[0], 0);
+            let cache = dir.path().join(codec);
+            fs::create_dir_all(&cache).unwrap();
+            let proxy = preview_proxy(path, metadata.duration_micros, &cache).unwrap();
+            assert_eq!(probe(&proxy).unwrap().codec, "h264");
+        }
+    }
+    #[test]
+    fn rejects_container_that_disagrees_with_extension() {
+        let dir = tempfile::tempdir().unwrap();
+        let mkv = dir.path().join("real.mkv");
+        generate(&mkv, &["-c:v", "libx264", "-pix_fmt", "yuv420p"]);
+        let mislabeled = dir.path().join("fake.mp4");
+        fs::copy(&mkv, &mislabeled).unwrap();
+        assert!(matches!(probe(&mislabeled), Err(AppError::Probe(_))));
+        let avi = dir.path().join("clip.avi");
+        generate(&avi, &["-c:v", "mpeg4"]);
+        assert!(matches!(
+            validate_input(&avi),
+            Err(AppError::UnsupportedInput(_))
+        ));
+        let avi_as_mp4 = dir.path().join("avi.mp4");
+        fs::copy(&avi, &avi_as_mp4).unwrap();
+        assert!(matches!(probe(&avi_as_mp4), Err(AppError::Probe(_))));
     }
     #[test]
     fn parses_fractional_rate() {

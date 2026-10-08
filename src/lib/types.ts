@@ -20,6 +20,8 @@ export interface LaunchOptions {
   quality: ExportQuality;
   onDone: OnDone;
   verbose: boolean;
+  /** Supported input extensions, lowercase, without the dot. */
+  inputExtensions: string[];
 }
 export interface VideoMetadata {
   path: string;

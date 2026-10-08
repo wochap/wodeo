@@ -31,11 +31,7 @@ pub fn init(
     }
     let file = tracing_appender::rolling::never(&dir, "wodeo.log");
     let (non_blocking, guard) = tracing_appender::non_blocking(file);
-    let filter = if verbose {
-        "wodeo=debug"
-    } else {
-        "wodeo=info"
-    };
+    let filter = if verbose { "wodeo=debug" } else { "wodeo=info" };
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(filter))
         .with(
@@ -136,10 +132,7 @@ mod tests {
             .map(|e| e.file_name().to_string_lossy().into_owned())
             .collect();
         left.sort();
-        assert_eq!(
-            left,
-            ["gstreamer-1.log", "gstreamer.log", "wodeo.log"]
-        )
+        assert_eq!(left, ["gstreamer-1.log", "gstreamer.log", "wodeo.log"])
     }
     #[test]
     fn instance_trace_is_removed_on_exit() {

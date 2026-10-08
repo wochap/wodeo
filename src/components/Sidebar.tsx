@@ -231,7 +231,7 @@ export function Sidebar({
                 data-testid="output-extension"
                 className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center font-mono text-[13px] text-neutral-500"
               >
-                .{extension(format)}
+                .{extension(format, video?.path)}
               </span>
             </div>
           </Field>

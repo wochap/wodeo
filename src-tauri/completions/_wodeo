@@ -17,7 +17,7 @@ _wodeo() {
 }
 
 _wodeo_input() {
-  _files -g "*.(#i)(mp4)(-.)"
+  _files -g "*.(#i)(mp4|m4v|mov|mkv|webm)(-.)"
 }
 
 if [[ $zsh_eval_context[-1] == loadautofunc ]]; then

@@ -24,6 +24,17 @@ impl Format {
             Self::Gif => "gif",
         }
     }
+    // Copy writes into the source container, so its extension follows the
+    // input; other formats have a fixed extension.
+    pub fn output_extension(self, input: &Path) -> String {
+        match self {
+            Self::Copy => input
+                .extension()
+                .and_then(|e| e.to_str())
+                .map_or_else(|| "mp4".into(), str::to_ascii_lowercase),
+            _ => self.extension().into(),
+        }
+    }
     fn from_extension(ext: &str) -> Option<Self> {
         match ext.to_ascii_lowercase().as_str() {
             "mp4" => Some(Self::Mp4),
@@ -102,7 +113,8 @@ pub fn resolve(cli: &Cli, file: &FileConfig) -> Effective {
         (None, Some(ext)) => Format::from_extension(ext).unwrap_or(file_format),
         (None, None) => file_format,
     };
-    if cli.format.is_some() {
+    // Copy's extension depends on the input, applied once it is known.
+    if cli.format.is_some() && format != Format::Copy {
         if let Some(out) = output.as_mut() {
             if !extension
                 .as_deref()
@@ -238,6 +250,24 @@ mod tests {
         assert_eq!(e.format, Format::Mp4);
     }
     #[test]
+    fn container_extension_does_not_imply_copy() {
+        let e = resolve(&cli(&["-o", "clip.mkv"]), &FileConfig::default());
+        assert_eq!(e.format, Format::Mp4);
+        assert_eq!(e.output.unwrap(), PathBuf::from("clip.mkv"));
+    }
+    #[test]
+    fn copy_output_extension_follows_input() {
+        assert_eq!(
+            Format::Copy.output_extension(Path::new("a/clip.MKV")),
+            "mkv"
+        );
+        assert_eq!(
+            Format::Copy.output_extension(Path::new("clip.webm")),
+            "webm"
+        );
+        assert_eq!(Format::Webm.output_extension(Path::new("clip.mkv")), "webm");
+    }
+    #[test]
     fn flag_overrides_output_extension() {
         let e = resolve(
             &cli(&["--format", "mp4", "-o", "clip.gif"]),
@@ -250,6 +280,11 @@ mod tests {
             &FileConfig::default(),
         );
         assert_eq!(e.output.unwrap(), PathBuf::from("clip.mp4"));
+        let e = resolve(
+            &cli(&["--format", "copy", "-o", "clip.gif"]),
+            &FileConfig::default(),
+        );
+        assert_eq!(e.output.unwrap(), PathBuf::from("clip.gif"));
         let e = resolve(
             &cli(&["--format", "webm", "-o", "dir/clip"]),
             &FileConfig::default(),

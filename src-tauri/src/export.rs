@@ -264,11 +264,11 @@ fn destination(input: &Path, output: &Path, format: Format) -> Result<PathBuf, A
     let name = output
         .file_name()
         .ok_or_else(|| AppError::Destination("missing filename".into()))?;
-    let required = format.extension();
+    let required = format.output_extension(&input);
     if Path::new(name)
         .extension()
         .and_then(|x| x.to_str())
-        .is_none_or(|x| !x.eq_ignore_ascii_case(required))
+        .is_none_or(|x| !x.eq_ignore_ascii_case(&required))
     {
         return Err(AppError::Destination(format!(
             "output must end in .{required}"
@@ -461,7 +461,16 @@ fn args(plan: &ExportPlan, kind: AttemptKind, node: Option<&Path>) -> Vec<String
     }
     a.extend(video_args(plan, kind));
     a.extend(audio_args(plan.format));
-    if matches!(plan.format, Format::Mp4 | Format::Copy) {
+    let iso_bmff = plan
+        .temp
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| {
+            ["mp4", "m4v", "mov"]
+                .iter()
+                .any(|v| e.eq_ignore_ascii_case(v))
+        });
+    if iso_bmff {
         a.extend(["-movflags", "+faststart"].map(String::from));
     }
     if plan.format != Format::Gif {
@@ -646,7 +655,7 @@ async fn run_export(
     let output = destination(&input, Path::new(&request.output), format)?;
     let temp = tempfile::Builder::new()
         .prefix(".wodeo-")
-        .suffix(&format!(".{}", format.extension()))
+        .suffix(&format!(".{}", format.output_extension(&input)))
         .tempfile_in(output.parent().unwrap())
         .map_err(|e| AppError::Destination(e.to_string()))?;
     let temp_path = temp.path().to_path_buf();
@@ -880,6 +889,11 @@ mod tests {
                 "{e}"
             );
         }
+        let mkv = d.path().join("in.mkv");
+        fs::write(&mkv, b"x").unwrap();
+        assert!(destination(&mkv, &d.path().join("out.MKV"), Format::Copy).is_ok());
+        let e = destination(&mkv, &d.path().join("out.mp4"), Format::Copy).unwrap_err();
+        assert!(e.to_string().contains(".mkv"), "{e}");
         let existing = d.path().join("existing.mp4");
         fs::write(&existing, b"old").unwrap();
         assert_eq!(
@@ -1173,6 +1187,133 @@ mod tests {
                 probed.duration_micros
             );
         }
+    }
+    fn format_name(path: &Path) -> String {
+        let out = std::process::Command::new("ffprobe")
+            .args([
+                "-v",
+                "error",
+                "-show_entries",
+                "format=format_name",
+                "-of",
+                "csv=p=0",
+            ])
+            .arg(path)
+            .output()
+            .unwrap();
+        String::from_utf8_lossy(&out.stdout).trim().to_owned()
+    }
+    fn gop_source(path: &Path, codec: &[&str]) {
+        let mut a = vec![
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=s=320x240:r=30:d=6",
+            "-g",
+            "60",
+            "-keyint_min",
+            "60",
+        ];
+        a.extend_from_slice(codec);
+        generate(path, &a);
+    }
+    #[test]
+    fn mkv_reencodes_to_exact_mp4() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("src.mkv");
+        let output = dir.path().join("out.mp4");
+        gop_source(&input, &["-c:v", "libx264", "-pix_fmt", "yuv420p"]);
+        run(&plan(
+            Format::Mp4,
+            Quality::Original,
+            &input,
+            &output,
+            1_000_000,
+            2_000_000,
+        ));
+        let probed = media::probe(&output).unwrap();
+        assert!(format_name(&output).contains("mov"));
+        assert!(
+            probed.duration_micros.abs_diff(2_000_000) <= 34_000,
+            "{}",
+            probed.duration_micros
+        );
+    }
+    #[test]
+    fn copy_keeps_matroska_and_webm_containers() {
+        let dir = tempfile::tempdir().unwrap();
+        let mkv = dir.path().join("src.mkv");
+        gop_source(
+            &mkv,
+            &[
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
+                "-sc_threshold",
+                "0",
+            ],
+        );
+        let ext = Format::Copy.output_extension(&mkv);
+        assert_eq!(ext, "mkv");
+        let out = dir.path().join(format!("copy.{ext}"));
+        let p = plan(
+            Format::Copy,
+            Quality::Original,
+            &mkv,
+            &out,
+            2_500_000,
+            2_000_000,
+        );
+        assert!(!args(&p, AttemptKind::Software, None)
+            .iter()
+            .any(|a| a == "+faststart"));
+        run(&p);
+        assert!(format_name(&out).contains("matroska"));
+        let index = media::probe(&mkv).unwrap().keyframes_micros;
+        assert_eq!(
+            media::keyframe_at_or_before(&index, 2_500_000),
+            Some(2_000_000)
+        );
+        let probed = media::probe(&out).unwrap();
+        assert_eq!(probed.codec, "h264");
+        // Same B-frame overshoot as MP4, plus Matroska counts the last
+        // frame's display duration.
+        assert!(
+            (2_400_000..=2_700_000).contains(&probed.duration_micros),
+            "{}",
+            probed.duration_micros
+        );
+        assert!(probed
+            .keyframes_micros
+            .first()
+            .is_some_and(|k| *k < 100_000));
+        let webm = dir.path().join("src.webm");
+        gop_source(
+            &webm,
+            &[
+                "-c:v",
+                "libvpx-vp9",
+                "-deadline",
+                "realtime",
+                "-cpu-used",
+                "8",
+            ],
+        );
+        let out = dir
+            .path()
+            .join(format!("copy.{}", Format::Copy.output_extension(&webm)));
+        assert_eq!(out.extension().unwrap(), "webm");
+        run(&plan(
+            Format::Copy,
+            Quality::Original,
+            &webm,
+            &out,
+            2_000_000,
+            2_000_000,
+        ));
+        assert!(format_name(&out).contains("webm"));
+        assert_eq!(media::probe(&out).unwrap().codec, "vp9");
     }
     #[test]
     fn copy_export_starts_at_preceding_keyframe() {

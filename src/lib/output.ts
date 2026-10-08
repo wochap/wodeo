@@ -1,6 +1,9 @@
 import type { ExportFormat } from "./types";
-export const extension = (format: ExportFormat) =>
-  format === "copy" ? "mp4" : format;
+/** Copy keeps the source container; other formats have fixed extensions. */
+export const extension = (format: ExportFormat, sourcePath?: string) =>
+  format === "copy"
+    ? (/\.([^./]+)$/.exec(sourcePath ?? "")?.[1]?.toLowerCase() ?? "mp4")
+    : format;
 /** Splits a POSIX path into its directory and file name. */
 export function splitPath(path: string) {
   const i = path.lastIndexOf("/");
@@ -22,8 +25,9 @@ export function joinOutput(
   dir: string,
   fileStem: string,
   format: ExportFormat,
+  sourcePath?: string,
 ) {
-  const file = `${fileStem}.${extension(format)}`;
+  const file = `${fileStem}.${extension(format, sourcePath)}`;
   if (!dir) return file;
   return dir.endsWith("/") ? `${dir}${file}` : `${dir}/${file}`;
 }

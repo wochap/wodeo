@@ -6,7 +6,7 @@ use std::path::PathBuf;
 #[command(
     name = "wodeo",
     version,
-    about = "Trim one MP4 precisely in a minimal Wayland UI"
+    about = "Trim one video precisely in a minimal Wayland UI"
 )]
 pub struct Cli {
     #[arg(value_name = "INPUT")]
@@ -46,6 +46,7 @@ pub struct LaunchOptions {
     pub quality: Quality,
     pub on_done: OnDone,
     pub verbose: bool,
+    pub input_extensions: Vec<String>,
 }
 impl LaunchOptions {
     pub fn new(cli: Cli, effective: Effective) -> Self {
@@ -56,6 +57,10 @@ impl LaunchOptions {
             quality: effective.quality,
             on_done: effective.on_done,
             verbose: cli.verbose,
+            input_extensions: crate::media::INPUT_EXTENSIONS
+                .iter()
+                .map(|e| (*e).to_owned())
+                .collect(),
         }
     }
 }
@@ -109,6 +114,10 @@ mod tests {
         assert_eq!(json["quality"], "original");
         assert_eq!(json["onDone"], "stay");
         assert!(json.get("force").is_none());
+        assert_eq!(
+            json["inputExtensions"],
+            serde_json::json!(["mp4", "m4v", "mov", "mkv", "webm"])
+        );
     }
     #[test]
     fn completions_flag_accepts_zsh_only() {

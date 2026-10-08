@@ -259,7 +259,10 @@ fn content_type(path: &std::path::Path) -> &'static str {
         .map(|v| v.to_ascii_lowercase())
         .as_deref()
     {
-        Some("mp4") => "video/mp4",
+        Some("mp4") | Some("m4v") => "video/mp4",
+        Some("mov") => "video/quicktime",
+        Some("mkv") => "video/x-matroska",
+        Some("webm") => "video/webm",
         Some("jpg") | Some("jpeg") => "image/jpeg",
         _ => "application/octet-stream",
     }

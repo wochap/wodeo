@@ -56,6 +56,7 @@ const launch: LaunchOptions = {
   quality: "original",
   onDone: "exit",
   verbose: false,
+  inputExtensions: ["mp4", "m4v", "mov", "mkv", "webm"],
 };
 const metadata = (
   path = "/videos/one.mp4",
@@ -157,6 +158,13 @@ describe("video loading shell", () => {
     expect(
       await screen.findByRole("heading", { name: "one.mp4" }),
     ).toBeVisible();
+    expect(h.open).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filters: [
+          { name: "Video", extensions: ["mp4", "m4v", "mov", "mkv", "webm"] },
+        ],
+      }),
+    );
     expect(screen.getByText("/videos")).toBeVisible();
     h.launch.mockResolvedValueOnce({ ...launch, input: "/videos/cli.mp4" });
     render(<VideoTrimmer />);
@@ -321,7 +329,36 @@ describe("video loading shell", () => {
         payload: { type: "drop", paths: ["a.mp4", "b.mp4"] },
       } as DragDropEvent),
     );
-    expect(await screen.findByText("Drop exactly one MP4 file.")).toBeVisible();
+    expect(
+      await screen.findByText(
+        "Drop exactly one video (mp4, m4v, mov, mkv, webm).",
+      ),
+    ).toBeVisible();
+  });
+  it("accepts supported containers on drop and rejects others", async () => {
+    render(<VideoTrimmer />);
+    await waitFor(() => expect(h.drag).toBeTypeOf("function"));
+    act(() =>
+      h.drag!({
+        payload: { type: "drop", paths: ["/videos/clip.MKV"] },
+      } as DragDropEvent),
+    );
+    await waitFor(() =>
+      expect(h.load).toHaveBeenCalledWith(
+        "/videos/clip.MKV",
+        expect.any(Number),
+      ),
+    );
+    act(() =>
+      h.drag!({
+        payload: { type: "drop", paths: ["/videos/clip.avi"] },
+      } as DragDropEvent),
+    );
+    expect(
+      await screen.findByText(
+        "Drop exactly one video (mp4, m4v, mov, mkv, webm).",
+      ),
+    ).toBeVisible();
   });
   it("reports preview and thumbnail degradation and can replace the input", async () => {
     await ready(metadata("/videos/one.mp4", "Timeline thumbnails unavailable"));

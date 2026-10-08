@@ -30,7 +30,10 @@ export interface Inspection {
   thumbnails: (string | null)[];
 }
 const NO_INSPECTION: Inspection = { step: null, fraction: 0, thumbnails: [] };
-const mp4 = (p: string) => p.toLowerCase().endsWith(".mp4");
+const supported = (p: string, extensions: string[]) => {
+  const ext = /\.([^./]+)$/.exec(p)?.[1]?.toLowerCase();
+  return !!ext && extensions.includes(ext);
+};
 // Export records replace earlier export records but keep playback ones.
 const withExport = (
   previous: AccelerationRecord[],
@@ -75,6 +78,7 @@ export function useTrimmer() {
       quality: "original",
       onDone: "exit",
       verbose: false,
+      inputExtensions: [],
     }),
     [acceleration, setAcceleration] = useState<AccelerationRecord[]>([]);
   const player = useRef<HTMLVideoElement>(null),
@@ -86,6 +90,8 @@ export function useTrimmer() {
     activeLoad = useRef(0),
     // `--output` names only the first loaded input; replacements derive their own.
     launchOutput = useRef<string | null>(null),
+    // Read through a ref so a load started from the launch handler sees it.
+    inputExtensions = useRef<string[]>([]),
     boundedStop = useRef<number | null>(null),
     boundedVersion = useRef(0),
     boundedSeekTarget = useRef<number | null>(null),
@@ -96,13 +102,15 @@ export function useTrimmer() {
   const step = frameStepMicros(video?.frameRate ?? 30);
   const outputPath =
     video && outputStem.trim()
-      ? joinOutput(outputDir, outputStem.trim(), format)
+      ? joinOutput(outputDir, outputStem.trim(), format, video.path)
       : "";
   const load = useCallback(
     async (path: string) => {
       if (phase === "exporting") return;
-      if (!mp4(path)) {
-        setError("Choose exactly one local MP4 file.");
+      if (!supported(path, inputExtensions.current)) {
+        setError(
+          `Choose exactly one local video (${inputExtensions.current.join(", ")}).`,
+        );
         setPhase(video ? "ready" : "error");
         return;
       }
@@ -149,7 +157,7 @@ export function useTrimmer() {
     const p = await open({
       multiple: false,
       directory: false,
-      filters: [{ name: "MP4 video", extensions: ["mp4"] }],
+      filters: [{ name: "Video", extensions: inputExtensions.current }],
     });
     if (typeof p === "string") await load(p);
   }, [load, phase]);
@@ -168,6 +176,7 @@ export function useTrimmer() {
       .launchOptions()
       .then((o) => {
         setLaunch(o);
+        inputExtensions.current = o.inputExtensions;
         setFormat(o.format);
         setQuality(o.quality);
         launchOutput.current = o.output;
@@ -188,9 +197,12 @@ export function useTrimmer() {
         else {
           setDrag(false);
           const paths = e.payload.paths;
-          if (paths.length === 1 && mp4(paths[0])) void load(paths[0]);
+          if (paths.length === 1 &&
+            supported(paths[0], inputExtensions.current)) void load(paths[0]);
           else {
-            setError("Drop exactly one MP4 file.");
+            setError(
+              `Drop exactly one video (${inputExtensions.current.join(", ")}).`,
+            );
             if (!video) setPhase("error");
           }
         }
