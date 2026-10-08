@@ -24,7 +24,7 @@ The system SHALL create one resizable main window without server-side or client-
 - **THEN** the video workspace occupies an undecorated window whose application-level exit action is `Cancel`
 
 ### Requirement: CLI input and output options
-The executable SHALL accept `wodeo [INPUT]`, `-o|--output <PATH>`, `--format <mp4|webm|gif|copy>`, `--quality <original|high|small>`, `--on-done <exit|stay>`, `-v|--verbose`, `-h|--help`, and `-V|--version` and SHALL reject unknown or malformed arguments before opening the window.
+The executable SHALL accept `wodeo [INPUT]`, `-o|--output <PATH>`, `--format <mp4|webm|gif|copy>`, `--quality <original|high|small>`, `--on-done <exit|stay>`, `-v|--verbose`, `--completions <zsh>`, `-h|--help`, and `-V|--version` and SHALL reject unknown or malformed arguments before opening the window.
 
 #### Scenario: Input argument supplied
 - **WHEN** the user launches with one valid positional input path
@@ -53,6 +53,40 @@ The executable SHALL accept `wodeo [INPUT]`, `-o|--output <PATH>`, `--format <mp
 #### Scenario: Invalid option value
 - **WHEN** a flag receives a value outside its accepted set
 - **THEN** the application prints usage to stderr and exits nonzero before creating a window
+
+### Requirement: Shell completion output
+The executable SHALL accept `--completions <SHELL>`, where `SHELL` is `zsh`, and SHALL print the embedded zsh completion script to stdout and exit 0 without verifying Wayland, reading configuration, initializing logging to files, or creating a window. Unsupported shell names MUST be rejected with usage on stderr and exit code 2.
+
+#### Scenario: Print zsh completion
+- **WHEN** the user runs `wodeo --completions zsh`
+- **THEN** stdout contains a script beginning with `#compdef wodeo` and the process exits 0
+
+#### Scenario: Completion without Wayland
+- **WHEN** the user runs `wodeo --completions zsh` with no Wayland display available
+- **THEN** the script is printed, no Wayland diagnostic is written, and the process exits 0
+
+#### Scenario: Unsupported shell
+- **WHEN** the user runs `wodeo --completions fish`
+- **THEN** clap prints usage to stderr and the process exits 2
+
+#### Scenario: Load completion via eval
+- **WHEN** a zsh user with `compinit` loaded runs `eval "$(wodeo --completions zsh)"` or `zsh-defer eval "$(wodeo --completions zsh)"`
+- **THEN** `wodeo <TAB>` completes flags, enum values for `--format`, `--quality`, `--on-done`, and input video files
+
+#### Scenario: Load completion via fpath
+- **WHEN** `_wodeo` is in a directory on `fpath` before `compinit`
+- **THEN** `wodeo <TAB>` completes the same flags and values as the eval path
+
+### Requirement: Completion script covers the CLI
+The zsh completion script SHALL mention every long and short flag defined by the CLI parser, and its `INPUT` file pattern SHALL match exactly the extensions accepted by input validation.
+
+#### Scenario: Flag added without completion
+- **WHEN** a developer adds a CLI flag without updating `_wodeo`
+- **THEN** the Rust test suite fails naming the missing flag
+
+#### Scenario: Input extension allowlist
+- **WHEN** input validation accepts only `mp4`
+- **THEN** the completion completes `INPUT` with `*.mp4` files (case-insensitive) and directories
 
 ### Requirement: Process ownership
 The system SHALL keep each invocation attached to the window and export it started and SHALL NOT forward arguments or completion to a pre-existing single-instance process.
