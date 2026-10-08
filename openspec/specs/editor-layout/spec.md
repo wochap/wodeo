@@ -58,7 +58,7 @@ The sidebar SHALL provide a `Format` control with `MP4`, `WebM`, `GIF`, and `Cop
 
 #### Scenario: Copy disables quality
 - **WHEN** `Copy` is selected
-- **THEN** the `Quality` control is disabled and the extension is `.mp4`
+- **THEN** the `Quality` control is disabled and the extension is the loaded source file's extension in lowercase (for example `.mkv` for `clip.MKV`)
 
 #### Scenario: Choose folder
 - **WHEN** the user activates the folder picker and chooses a directory

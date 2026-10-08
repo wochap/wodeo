@@ -28,7 +28,7 @@ The configuration file SHALL accept the optional keys `format` (`mp4`, `webm`, `
 - **THEN** the application prints a diagnostic naming the file and the offending key to stderr and exits with the startup failure status before creating a window
 
 ### Requirement: Option precedence
-The system SHALL resolve each option in this order, later sources winning: built-in default, configuration file, output path extension (format only), explicit command-line flag.
+The system SHALL resolve each option in this order, later sources winning: built-in default, configuration file, output path extension (format only), explicit command-line flag. Only the extensions `mp4`, `webm`, and `gif` imply a format. When the effective format is `copy`, the system SHALL NOT rewrite the `--output` extension at launch; the editor and export apply the source file's extension once the input is known.
 
 #### Scenario: Flag overrides file
 - **WHEN** the file sets `quality = "small"` and the command line passes `--quality high`
@@ -41,6 +41,14 @@ The system SHALL resolve each option in this order, later sources winning: built
 #### Scenario: Flag overrides output extension
 - **WHEN** `--format mp4` and `--output clip.gif` are both given
 - **THEN** the effective format is `mp4` and the destination becomes `clip.mp4`
+
+#### Scenario: Container extension does not imply copy
+- **WHEN** no `--format` flag is given, the file sets no format, and `--output clip.mkv` is given
+- **THEN** the effective format is the built-in default `mp4`
+
+#### Scenario: Copy leaves the output extension for later
+- **WHEN** `--format copy --output clip.mp4` is given and the loaded input is `in.mkv`
+- **THEN** the launch output stays `clip.mp4` and the editor shows file name `clip` with extension `.mkv`
 
 ### Requirement: Effective options exposed to the editor
 The system SHALL pass the effective format, quality, and on-done policy to the editor at launch so the editor can preselect them.

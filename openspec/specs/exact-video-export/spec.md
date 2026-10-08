@@ -59,7 +59,7 @@ The system SHALL parse machine-readable FFmpeg progress, update the UI during ex
 - **THEN** the dialog marks the previous step complete and the next step active
 
 ### Requirement: Safe destination handling
-The system MUST render to a uniquely named temporary file in the destination directory and SHALL finalize the destination only after FFmpeg exits successfully and the temporary output passes validation. The destination extension MUST match the effective format (`.mp4` for `mp4` and `copy`, `.webm`, `.gif`). The system MUST refuse a destination that resolves to the source file.
+The system MUST render to a uniquely named temporary file in the destination directory and SHALL finalize the destination only after FFmpeg exits successfully and the temporary output passes validation. The destination extension MUST match the effective format (`.mp4` for `mp4`, `.webm`, `.gif`, and for `copy` the source file's extension, compared case-insensitively). The system MUST refuse a destination that resolves to the source file.
 
 #### Scenario: Destination does not exist
 - **WHEN** a valid export completes
@@ -81,6 +81,10 @@ The system MUST render to a uniquely named temporary file in the destination dir
 - **WHEN** the destination extension does not match the effective format
 - **THEN** the system does not start export and reports the required extension
 
+#### Scenario: Copy destination extension
+- **WHEN** the format is `copy`, the source is `in.mkv`, and the destination is `out.mp4`
+- **THEN** the system does not start export and reports that `.mkv` is required
+
 #### Scenario: Export is cancelled
 - **WHEN** the user confirms cancellation during export
 - **THEN** the system terminates FFmpeg, removes the temporary file, preserves any pre-existing destination, and exits without printing a path
@@ -93,7 +97,7 @@ The system SHALL validate that the completed output is readable and contains a v
 - **THEN** the system logs completion, prints the canonical absolute destination path to application stdout, and exits successfully
 
 ### Requirement: Output format selection
-The system SHALL export the selected interval in one of four formats chosen by the user: `mp4` (H.264 video, AAC audio), `webm` (VP9 video, Opus audio), `gif` (animated GIF, no audio), or `copy` (stream copy of the source video and audio into an MP4 container without re-encoding).
+The system SHALL export the selected interval in one of four formats chosen by the user: `mp4` (H.264 video, AAC audio), `webm` (VP9 video, Opus audio), `gif` (animated GIF, no audio), or `copy` (stream copy of the source video and audio into the source file's container without re-encoding). The system SHALL request MP4 fast-start layout only when the output container is ISO-BMFF (`mp4`, `m4v`, `mov`).
 
 #### Scenario: WebM export
 - **WHEN** the format is `webm`
@@ -106,6 +110,10 @@ The system SHALL export the selected interval in one of four formats chosen by t
 #### Scenario: Copy export
 - **WHEN** the format is `copy`
 - **THEN** the system copies the source streams without decoding, the output ends at the selected end within one source frame, and the output begins at the nearest keyframe at or before the selected start
+
+#### Scenario: Copy keeps the source container
+- **WHEN** the format is `copy` and the source is `clip.mkv`
+- **THEN** the output is a Matroska file named with the `.mkv` extension and no fast-start option is passed to FFmpeg
 
 ### Requirement: Quality tiers
 The system SHALL apply the selected quality tier to re-encoding formats as a resolution cap and encoder rate control, and SHALL ignore quality for `copy`. Tiers: `original` (source resolution), `high` (longest side capped at 1080 for video, width capped at 720 for GIF), `small` (longest side capped at 720 for video, width capped at 480 for GIF). GIF frame rates are 15, 12, and 10 frames per second for `original`, `high`, and `small`.

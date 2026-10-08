@@ -1,50 +1,69 @@
 # video-loading-preview Specification
 
 ## Purpose
-Define secure MP4 selection, validation, preview, and degraded thumbnail behavior.
+Define secure selection, validation, preview, and degraded thumbnail behavior for supported video containers (ISO-BMFF and Matroska).
 
 ## Requirements
 
 ### Requirement: Empty-state video selection
-The system SHALL present the undecorated window as a clear file-selection target when no video is loaded, with a `Choose video…` action in the drop target and an `Open…` action in the header, and SHALL allow a user to invoke an MP4 file picker using either mouse or keyboard. Once a video is loaded the header action reads `Replace` and opens the same picker.
+The system SHALL present the undecorated window as a clear file-selection target when no video is loaded, with a `Choose video…` action in the drop target and an `Open…` action in the header, and SHALL allow a user to invoke a file picker filtered to supported video containers using either mouse or keyboard. Once a video is loaded the header action reads `Replace` and opens the same picker.
 
 #### Scenario: Select with the mouse
-- **WHEN** the user clicks `Choose video…` or `Open…` and chooses a valid MP4
+- **WHEN** the user clicks `Choose video…` or `Open…` and chooses a valid supported video
 - **THEN** the system loads that file for inspection and preview
 
 #### Scenario: Select with the keyboard
 - **WHEN** the user focuses and activates the empty-state selection target, presses `Enter` in the empty state, or presses `Ctrl+O`
-- **THEN** the system opens a keyboard-operable MP4 file picker
+- **THEN** the system opens a keyboard-operable file picker filtered to supported video containers
 
 #### Scenario: Cancel selection
 - **WHEN** the user cancels the file picker
 - **THEN** the system remains in the empty state without reporting an error
 
 #### Scenario: Replace a loaded video
-- **WHEN** the user activates `Replace` and chooses another valid MP4
+- **WHEN** the user activates `Replace` and chooses another valid supported video
 - **THEN** the system loads the new file, resets the selection to its full duration, and derives a new default output name
 
 ### Requirement: Native file drag and drop
-The system SHALL accept exactly one local MP4 path delivered by Tauri's native drag-and-drop event and SHALL provide visible feedback while an acceptable file is over the window.
+The system SHALL accept exactly one local supported video path delivered by Tauri's native drag-and-drop event and SHALL provide visible feedback while an acceptable file is over the window.
 
-#### Scenario: Drop one MP4
-- **WHEN** the user drops exactly one valid MP4 anywhere on the window while no export is running
+#### Scenario: Drop one supported video
+- **WHEN** the user drops exactly one valid supported video anywhere on the window while no export is running
 - **THEN** the system loads the dropped file and resets the trim selection to its full duration
 
 #### Scenario: Drop an unsupported selection
-- **WHEN** the user drops multiple paths, a directory, or a non-MP4 file
+- **WHEN** the user drops multiple paths, a directory, or a file outside the supported containers
 - **THEN** the system rejects the drop with an actionable message and retains the currently loaded video, if any
 
 ### Requirement: Input validation and probing
-The system MUST use ffprobe to validate that the selected local file is a readable MP4 containing at least one video stream and SHALL obtain its duration, dimensions, codec, frame-rate information, and audio-stream presence before entering the ready state.
+The system MUST use ffprobe to validate that the selected local file is a readable supported video container containing at least one video stream and SHALL obtain its duration, dimensions, codec, frame-rate information, and audio-stream presence before entering the ready state.
 
-#### Scenario: Valid MP4
-- **WHEN** ffprobe successfully identifies a video stream in an MP4
+#### Scenario: Valid supported video
+- **WHEN** ffprobe successfully identifies a video stream in a supported container
 - **THEN** the system exposes the probed metadata to the editor and enters the ready state
 
 #### Scenario: Invalid or unreadable input
-- **WHEN** the selected path is missing, unreadable, malformed, not an MP4, or contains no video stream
+- **WHEN** the selected path is missing, unreadable, malformed, not a supported container, or contains no video stream
 - **THEN** the system displays a concise error and allows the user to choose another file
+
+### Requirement: Supported input containers
+The system SHALL accept as input only files whose extension is one of `mp4`, `m4v`, `mov`, `mkv`, `webm` (case-insensitive) and whose ffprobe `format_name` includes `mov` (ISO-BMFF family) or `matroska` (Matroska family). The file picker filter, drag-and-drop acceptance, extension validation, and shell completion SHALL derive from this single allowlist.
+
+#### Scenario: Supported extension and container
+- **WHEN** the user opens `clip.MKV` and ffprobe reports `matroska,webm` with a video stream
+- **THEN** the system accepts the file and proceeds with inspection
+
+#### Scenario: Unsupported extension
+- **WHEN** the user opens `clip.avi` or `clip.ts`
+- **THEN** the system rejects it as unsupported before running ffprobe
+
+#### Scenario: Extension and container disagree
+- **WHEN** the user opens `clip.mp4` whose ffprobe `format_name` is `avi`
+- **THEN** the system rejects the file as an unsupported container
+
+#### Scenario: Fallback preview content type
+- **WHEN** proxy generation fails and the original file is served
+- **THEN** the response `Content-Type` is `video/mp4` for `mp4`/`m4v`, `video/quicktime` for `mov`, `video/x-matroska` for `mkv`, and `video/webm` for `webm`
 
 ### Requirement: Secure local preview
 The system SHALL preview the currently selected file through a loopback HTTP endpoint managed by the application, bound to `127.0.0.1` on an ephemeral port, and SHALL authorize only that file's generated preview proxy (or the file itself when proxy generation fails) and its generated thumbnails for serving. The endpoint MUST NOT accept filesystem paths in request URLs and MUST NOT grant the webview blanket access to the user's home directory. Generated thumbnails MAY continue to use the Tauri asset protocol.
@@ -58,14 +77,14 @@ The system SHALL preview the currently selected file through a loopback HTTP end
 - **THEN** the system revokes or stops using the previous preview and displays the new file
 
 ### Requirement: Seek-friendly preview proxy
-The system SHALL derive a preview proxy from the selected MP4 by re-encoding it with dense keyframes, a leading moov atom, and fresh timing metadata, and SHALL serve that proxy at the loopback media endpoint. The proxy SHALL preserve the source timestamps so that trim positions chosen against the preview remain valid, and export SHALL continue to read the original file.
+The system SHALL derive a preview proxy from the selected video by re-encoding it into an MP4 with dense keyframes, a leading moov atom, and fresh timing metadata, and SHALL serve that proxy at the loopback media endpoint. The proxy SHALL preserve the source timestamps so that trim positions chosen against the preview remain valid, and export SHALL continue to read the original file.
 
 #### Scenario: Proxy generation succeeds
-- **WHEN** a valid MP4 finishes probing and FFmpeg builds the proxy
+- **WHEN** a valid supported video finishes probing and FFmpeg builds the proxy
 - **THEN** the system plays the proxy in place of the raw file so that seeking lands on a nearby keyframe without flushing the displayed frame
 
 #### Scenario: Proxy generation fails
-- **WHEN** FFmpeg cannot build the proxy for a probed MP4
+- **WHEN** FFmpeg cannot build the proxy for a probed video
 - **THEN** the system serves the original file at the preview endpoint and records the degraded state
 
 ### Requirement: Loopback media streaming
