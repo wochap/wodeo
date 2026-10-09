@@ -38,6 +38,8 @@ vi.mock("@tauri-apps/api/window", () => ({
       h.drag = cb;
       return () => {};
     }),
+    theme: vi.fn().mockResolvedValue("dark"),
+    onThemeChanged: vi.fn().mockResolvedValue(() => {}),
   }),
 }));
 vi.mock("@tauri-apps/api/event", () => ({

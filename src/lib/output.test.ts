@@ -17,8 +17,14 @@ describe("output naming", () => {
     expect(joinOutput("/", "clip", "copy")).toBe("/clip.mp4");
   });
   it("keeps the source extension for copy", () => {
-    expect(joinOutput("/tmp", "clip", "copy", "/v/in.MKV")).toBe("/tmp/clip.mkv");
-    expect(joinOutput("/tmp", "clip", "copy", "/v/in.webm")).toBe("/tmp/clip.webm");
-    expect(joinOutput("/tmp", "clip", "mp4", "/v/in.mkv")).toBe("/tmp/clip.mp4");
+    expect(joinOutput("/tmp", "clip", "copy", "/v/in.MKV")).toBe(
+      "/tmp/clip.mkv",
+    );
+    expect(joinOutput("/tmp", "clip", "copy", "/v/in.webm")).toBe(
+      "/tmp/clip.webm",
+    );
+    expect(joinOutput("/tmp", "clip", "mp4", "/v/in.mkv")).toBe(
+      "/tmp/clip.mp4",
+    );
   });
 });

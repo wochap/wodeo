@@ -197,8 +197,11 @@ export function useTrimmer() {
         else {
           setDrag(false);
           const paths = e.payload.paths;
-          if (paths.length === 1 &&
-            supported(paths[0], inputExtensions.current)) void load(paths[0]);
+          if (
+            paths.length === 1 &&
+            supported(paths[0], inputExtensions.current)
+          )
+            void load(paths[0]);
           else {
             setError(
               `Drop exactly one video (${inputExtensions.current.join(", ")}).`,

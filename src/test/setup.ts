@@ -14,6 +14,19 @@ Object.defineProperty(HTMLElement.prototype, "setPointerCapture", {
   configurable: true,
   value: vi.fn(),
 });
+Object.defineProperty(window, "matchMedia", {
+  configurable: true,
+  value: (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }),
+});
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
   convertFileSrc: (p: string) => `asset://localhost/${encodeURIComponent(p)}`,
@@ -22,6 +35,8 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn(), save: vi.fn() }));
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
     onDragDropEvent: vi.fn().mockResolvedValue(() => {}),
+    theme: vi.fn().mockResolvedValue("dark"),
+    onThemeChanged: vi.fn().mockResolvedValue(() => {}),
   }),
 }));
 vi.mock("@tauri-apps/api/event", () => ({

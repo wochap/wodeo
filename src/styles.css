@@ -1,38 +1,224 @@
 @import "@fontsource-variable/inter";
 @import "tailwindcss";
-/* Nocturne design tokens (video-trimmer-app-redesign/project/_ds/nocturne-*). */
-@theme {
+/* Nocturne design tokens on Catppuccin (design/project/_ds/nocturne-*).
+   Raw palette and per-mode knobs: Mocha on :root, Latte in the light blocks. */
+:root {
+  color-scheme: dark;
+  --ctp-base: #1e1e2e;
+  --ctp-mantle: #181825;
+  --ctp-crust: #11111b;
+  --ctp-surface0: #313244;
+  --ctp-surface1: #45475a;
+  --ctp-surface2: #585b70;
+  --ctp-overlay0: #6c7086;
+  --ctp-overlay1: #7f849c;
+  --ctp-overlay2: #9399b2;
+  --ctp-subtext0: #a6adc8;
+  --ctp-subtext1: #bac2de;
+  --ctp-text: #cdd6f4;
+  --ctp-lavender: #b4befe;
+  --ctp-mauve: #cba6f7;
+  --ctp-blue: #89b4fa;
+  --ctp-red: #f38ba8;
+  --ctp-green: #a6e3a1;
+  --ctp-yellow: #f9e2af;
+  --ctp-peach: #fab387;
+  --divider-mix: 16%;
+  --shade-md: rgba(0, 0, 0, 0.55);
+  --shade-lg: rgba(0, 0, 0, 0.65);
+  --neutral-800: var(--ctp-mantle);
+  --neutral-700: var(--ctp-surface1);
+  --neutral-600: var(--ctp-surface2);
+  --neutral-500: var(--ctp-overlay2);
+  --neutral-400: var(--ctp-subtext0);
+  --neutral-300: var(--ctp-subtext1);
+  --surface: var(--ctp-surface0);
+  --accent-base: var(--ctp-lavender);
+  --accent-2-base: var(--ctp-mauve);
+}
+/* Latte: the OS preference applies unless data-theme="dark"; data-theme="light" always wins. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --ctp-base: #eff1f5;
+    --ctp-mantle: #e6e9ef;
+    --ctp-crust: #dce0e8;
+    --ctp-surface0: #ccd0da;
+    --ctp-surface1: #bcc0cc;
+    --ctp-surface2: #acb0be;
+    --ctp-overlay0: #9ca0b0;
+    --ctp-overlay1: #8c8fa1;
+    --ctp-overlay2: #7c7f93;
+    --ctp-subtext0: #6c6f85;
+    --ctp-subtext1: #5c5f77;
+    --ctp-text: #4c4f69;
+    --ctp-lavender: #7287fd;
+    --ctp-mauve: #8839ef;
+    --ctp-blue: #1e66f5;
+    --ctp-red: #d20f39;
+    --ctp-green: #40a02b;
+    --ctp-yellow: #df8e1d;
+    --ctp-peach: #fe640b;
+    --divider-mix: 20%;
+    --shade-md: rgba(0, 0, 0, 0.12);
+    --shade-lg: rgba(0, 0, 0, 0.18);
+    --neutral-800: var(--ctp-mantle);
+    --neutral-700: var(--ctp-surface0);
+    --neutral-600: var(--ctp-surface1);
+    --neutral-500: var(--ctp-subtext1);
+    --neutral-400: var(--ctp-text);
+    --neutral-300: var(--ctp-text);
+    --surface: var(--ctp-mantle);
+    /* Latte blue keeps accent text readable on the light ground. */
+    --accent-base: var(--ctp-blue);
+    --accent-2-base: var(--ctp-mauve);
+  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --ctp-base: #eff1f5;
+  --ctp-mantle: #e6e9ef;
+  --ctp-crust: #dce0e8;
+  --ctp-surface0: #ccd0da;
+  --ctp-surface1: #bcc0cc;
+  --ctp-surface2: #acb0be;
+  --ctp-overlay0: #9ca0b0;
+  --ctp-overlay1: #8c8fa1;
+  --ctp-overlay2: #7c7f93;
+  --ctp-subtext0: #6c6f85;
+  --ctp-subtext1: #5c5f77;
+  --ctp-text: #4c4f69;
+  --ctp-lavender: #7287fd;
+  --ctp-mauve: #8839ef;
+  --ctp-blue: #1e66f5;
+  --ctp-red: #d20f39;
+  --ctp-green: #40a02b;
+  --ctp-yellow: #df8e1d;
+  --ctp-peach: #fe640b;
+  --divider-mix: 20%;
+  --shade-md: rgba(0, 0, 0, 0.12);
+  --shade-lg: rgba(0, 0, 0, 0.18);
+  --neutral-800: var(--ctp-mantle);
+  --neutral-700: var(--ctp-surface0);
+  --neutral-600: var(--ctp-surface1);
+  --neutral-500: var(--ctp-subtext1);
+  --neutral-400: var(--ctp-text);
+  --neutral-300: var(--ctp-text);
+  --surface: var(--ctp-mantle);
+  /* Latte blue keeps accent text readable on the light ground. */
+  --accent-base: var(--ctp-blue);
+  --accent-2-base: var(--ctp-mauve);
+}
+@theme inline {
   --color-*: initial;
-  --color-bg: #161826;
-  --color-surface: #232532;
-  --color-text: #e9e9ed;
-  --color-accent: #9184d9;
-  --color-accent-2: #a7a1db;
-  --color-divider: color-mix(in srgb, #e9e9ed 16%, transparent);
-  --color-danger: #e0707a;
+  --color-bg: var(--ctp-base);
+  --color-surface: var(--surface);
+  --color-text: var(--ctp-text);
+  --color-accent: var(--accent-base);
+  --color-accent-2: var(--accent-2-base);
+  --color-divider: color-mix(
+    in srgb,
+    var(--ctp-text) var(--divider-mix),
+    transparent
+  );
+  --color-danger: var(--ctp-red);
   --color-black: #000;
   --color-white: #fff;
   --color-transparent: transparent;
 
-  --color-neutral-100: #f3f5fe;
-  --color-neutral-200: #e4e7f5;
-  --color-neutral-300: #cfd3e5;
-  --color-neutral-400: #b2b6ca;
-  --color-neutral-500: #9397ab;
-  --color-neutral-600: #75798c;
-  --color-neutral-700: #595d6c;
-  --color-neutral-800: #3f424d;
-  --color-neutral-900: #292b31;
+  --color-neutral-100: var(--ctp-text);
+  --color-neutral-200: var(--ctp-subtext1);
+  --color-neutral-300: var(--neutral-300);
+  --color-neutral-400: var(--neutral-400);
+  --color-neutral-500: var(--neutral-500);
+  --color-neutral-600: var(--neutral-600);
+  --color-neutral-700: var(--neutral-700);
+  --color-neutral-800: var(--neutral-800);
+  --color-neutral-900: var(--ctp-crust);
 
-  --color-accent-100: #f5f4ff;
-  --color-accent-200: #e7e5fe;
-  --color-accent-300: #d2cefd;
-  --color-accent-400: #b5abfc;
-  --color-accent-500: #968ae0;
-  --color-accent-600: #796cbf;
-  --color-accent-700: #5d5294;
-  --color-accent-800: #423a6a;
-  --color-accent-900: #2b2741;
+  --color-accent-100: color-mix(
+    in oklch,
+    var(--accent-base) 30%,
+    var(--ctp-text)
+  );
+  --color-accent-200: color-mix(
+    in oklch,
+    var(--accent-base) 55%,
+    var(--ctp-text)
+  );
+  --color-accent-300: color-mix(
+    in oklch,
+    var(--accent-base) 78%,
+    var(--ctp-text)
+  );
+  --color-accent-400: color-mix(
+    in oklch,
+    var(--accent-base) 92%,
+    var(--ctp-text)
+  );
+  --color-accent-500: var(--accent-base);
+  --color-accent-600: color-mix(
+    in oklch,
+    var(--accent-base) 72%,
+    var(--ctp-base)
+  );
+  --color-accent-700: color-mix(
+    in oklch,
+    var(--accent-base) 50%,
+    var(--ctp-base)
+  );
+  --color-accent-800: color-mix(
+    in oklch,
+    var(--accent-base) 32%,
+    var(--ctp-base)
+  );
+  --color-accent-900: color-mix(
+    in oklch,
+    var(--accent-base) 18%,
+    var(--ctp-base)
+  );
+
+  --color-accent-2-100: color-mix(
+    in oklch,
+    var(--accent-2-base) 30%,
+    var(--ctp-text)
+  );
+  --color-accent-2-200: color-mix(
+    in oklch,
+    var(--accent-2-base) 55%,
+    var(--ctp-text)
+  );
+  --color-accent-2-300: color-mix(
+    in oklch,
+    var(--accent-2-base) 78%,
+    var(--ctp-text)
+  );
+  --color-accent-2-400: color-mix(
+    in oklch,
+    var(--accent-2-base) 92%,
+    var(--ctp-text)
+  );
+  --color-accent-2-500: var(--accent-2-base);
+  --color-accent-2-600: color-mix(
+    in oklch,
+    var(--accent-2-base) 72%,
+    var(--ctp-base)
+  );
+  --color-accent-2-700: color-mix(
+    in oklch,
+    var(--accent-2-base) 50%,
+    var(--ctp-base)
+  );
+  --color-accent-2-800: color-mix(
+    in oklch,
+    var(--accent-2-base) 32%,
+    var(--ctp-base)
+  );
+  --color-accent-2-900: color-mix(
+    in oklch,
+    var(--accent-2-base) 18%,
+    var(--ctp-base)
+  );
 
   --font-sans: "Inter Variable", "Inter", system-ui, sans-serif;
   --font-mono: ui-monospace, Menlo, monospace;
@@ -41,9 +227,9 @@
   --radius-md: 8px;
   --radius-lg: 14px;
 
-  --shadow-sm: 0 0 0 1px #3f424d;
-  --shadow-md: 0 0 0 1px #595d6c, 0 6px 18px rgba(0, 0, 0, 0.55);
-  --shadow-lg: 0 0 0 1px #9397ab, 0 16px 40px rgba(0, 0, 0, 0.65);
+  --shadow-sm: 0 0 0 1px var(--ctp-surface1);
+  --shadow-md: 0 0 0 1px var(--ctp-surface2), 0 6px 18px var(--shade-md);
+  --shadow-lg: 0 0 0 1px var(--ctp-overlay0), 0 16px 40px var(--shade-lg);
 }
 @layer base {
   * {
