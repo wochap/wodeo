@@ -47,3 +47,6 @@ design/**/*.jpg
 .thumbnail
 
 result
+
+# Nix build output
+/result
