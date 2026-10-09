@@ -250,6 +250,8 @@
     font-family: var(--font-sans);
     font-size: 15px;
     line-height: 1.55;
+    -webkit-user-select: none;
+    user-select: none;
   }
   :focus {
     outline: none;

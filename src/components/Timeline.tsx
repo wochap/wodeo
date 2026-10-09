@@ -75,6 +75,7 @@ export function ThumbnailStrip({
             key={i}
             src={src}
             alt=""
+            draggable={false}
             className="h-full min-w-0 flex-1 object-cover"
           />
         ) : (
@@ -99,6 +100,7 @@ export function Timeline({
   onRange,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const isScrubbing = useRef(false);
   const pct = (v: number) => `${duration ? (100 * v) / duration : 0}%`;
   const at = (e: PointerEvent) => {
     const r = ref.current!.getBoundingClientRect();
@@ -168,11 +170,18 @@ export function Timeline({
         ref={ref}
         className="relative h-[84px] touch-none"
         onPointerDown={(e) => {
-          if (e.target === e.currentTarget) onSeek(at(e));
+          if (e.target !== e.currentTarget) return;
+          e.preventDefault();
+          e.currentTarget.setPointerCapture(e.pointerId);
+          isScrubbing.current = true;
+          onSeek(at(e));
         }}
         onPointerMove={(e) => {
-          if (e.buttons && e.target === e.currentTarget) onSeek(at(e));
+          if (isScrubbing.current && e.buttons) onSeek(at(e));
         }}
+        onPointerUp={() => (isScrubbing.current = false)}
+        onPointerCancel={() => (isScrubbing.current = false)}
+        onLostPointerCapture={() => (isScrubbing.current = false)}
       >
         <div className="pointer-events-none absolute inset-0 flex gap-0.5 overflow-hidden rounded-md">
           {thumbnails.length ? (
@@ -182,6 +191,7 @@ export function Timeline({
                   key={i}
                   src={t}
                   alt=""
+                  draggable={false}
                   className="h-full min-w-0 flex-1 object-cover"
                 />
               ) : (

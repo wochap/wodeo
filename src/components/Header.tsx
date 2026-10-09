@@ -35,7 +35,7 @@ export function Header({
   return (
     <header className="flex min-w-0 items-center gap-3.5 border-b border-divider px-5">
       {file ? (
-        <div className="flex min-w-0 flex-col gap-0.5 leading-tight">
+        <div className="flex min-w-0 flex-col gap-0.5 leading-tight select-text">
           <h1 className="max-w-[380px] truncate text-sm font-medium">
             {file.name}
           </h1>

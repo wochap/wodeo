@@ -138,6 +138,68 @@ describe("complete timeline interaction", () => {
     expect(range).toHaveBeenLastCalledWith(100_000, 750_000, "end");
   });
 });
+describe("track scrubbing", () => {
+  const setup = (thumbnails: (string | null)[] = []) => {
+    const seek = vi.fn();
+    render(
+      <Timeline
+        duration={1_000_000}
+        start={100_000}
+        end={900_000}
+        playhead={500_000}
+        step={40_000}
+        thumbnails={thumbnails}
+        onSeek={seek}
+        onRange={() => {}}
+      />,
+    );
+    const startHandle = screen.getByRole("slider", { name: "Trim start" });
+    const track = startHandle.parentElement!;
+    vi.spyOn(track, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      width: 100,
+      right: 100,
+      top: 0,
+      bottom: 80,
+      height: 80,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+    return { seek, track, startHandle };
+  };
+  it("captures the pointer and keeps scrubbing over handles until release", () => {
+    const { seek, track, startHandle } = setup();
+    const capture = vi.spyOn(track, "setPointerCapture");
+    fireEvent.pointerDown(track, { clientX: 50, pointerId: 1 });
+    expect(capture).toHaveBeenCalledWith(1);
+    expect(seek).toHaveBeenLastCalledWith(500_000);
+    fireEvent.pointerMove(startHandle, { clientX: 10, buttons: 1 });
+    expect(seek).toHaveBeenLastCalledWith(100_000);
+    fireEvent.pointerUp(track);
+    seek.mockClear();
+    fireEvent.pointerMove(track, { clientX: 30, buttons: 1 });
+    expect(seek).not.toHaveBeenCalled();
+  });
+  it("clamps moves beyond the track", () => {
+    const { seek, track } = setup();
+    fireEvent.pointerDown(track, { clientX: 50, pointerId: 1 });
+    fireEvent.pointerMove(track, { clientX: -40, buttons: 1 });
+    expect(seek).toHaveBeenLastCalledWith(0);
+    fireEvent.pointerMove(track, { clientX: 240, buttons: 1 });
+    expect(seek).toHaveBeenLastCalledWith(1_000_000);
+  });
+  it("does not seek from a handle press and keeps thumbnails undraggable", () => {
+    const { seek, startHandle } = setup(["asset://a.jpg", null]);
+    fireEvent.pointerDown(startHandle, { clientX: 20, pointerId: 1 });
+    expect(seek).not.toHaveBeenCalled();
+    for (const img of document.querySelectorAll("img"))
+      expect(img).toHaveAttribute("draggable", "false");
+    render(<ThumbnailStrip thumbnails={["asset://b.jpg"]} />);
+    for (const img of document.querySelectorAll("img"))
+      expect(img).toHaveAttribute("draggable", "false");
+  });
+});
 describe("adaptive ruler", () => {
   const labels = (duration: number) => {
     render(
