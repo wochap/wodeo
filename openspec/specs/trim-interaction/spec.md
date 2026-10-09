@@ -28,19 +28,31 @@ The system SHALL allow playback, seeking, range selection, cancellation, and exp
 - **THEN** the preview toggles between playing and paused
 
 ### Requirement: Complete keyboard operation
-The system SHALL allow every trimming workflow action using the keyboard, SHALL avoid overriding keystrokes used by a focused native dialog or text-like control, and SHALL display the active shortcuts as hint chips in the transport bar.
+The system SHALL allow every trimming workflow action using the keyboard, SHALL avoid overriding keystrokes used by a focused native dialog or text-like control, and SHALL display the active shortcuts as hint chips in the transport bar. Navigation keys SHALL act on the focused trim handle when one has keyboard focus, and on the playhead otherwise. A single keypress MUST NOT move both a trim handle and the playhead.
 
 #### Scenario: Playback and seek shortcuts
-- **WHEN** the editor has focus and the user presses `Space`, `Left`, `Right`, `Shift+Left`, or `Shift+Right`
+- **WHEN** the editor has focus, no trim handle is focused, and the user presses `Space`, `Left`, `Right`, `Shift+Left`, or `Shift+Right`
 - **THEN** the system respectively toggles playback, seeks approximately one probed frame backward or forward, or seeks one second backward or forward
+
+#### Scenario: Coarse playhead navigation
+- **WHEN** the editor has focus, no trim handle is focused, and the user presses `PageUp`, `PageDown`, `Alt+Left`, `Alt+Right`, or a digit `0`–`9` on the main row or numpad
+- **THEN** the system respectively seeks ten seconds forward or backward, seeks to the previous or next source keyframe, or seeks to that digit's tenth of the duration (`0` = start, `9` = 90%), clamped to the media duration
 
 #### Scenario: Set boundaries from playhead
 - **WHEN** the editor has focus and the user presses `I` or `O`
 - **THEN** the system sets the start or end boundary to the current playhead time subject to range validity
 
 #### Scenario: Adjust a focused boundary
-- **WHEN** a trim handle has keyboard focus and the user presses an arrow key, `Home`, or `End`
-- **THEN** the system adjusts it by one probed frame or moves it to its allowed duration endpoint without crossing the other handle
+- **WHEN** a trim handle has keyboard focus and the user presses `Left`, `Right`, `Shift+Left`, `Shift+Right`, `PageUp`, `PageDown`, `Alt+Left`, `Alt+Right`, a digit `0`–`9` on the main row or numpad, `Home`, or `End`
+- **THEN** the system moves that boundary by one probed frame, one second, ten seconds, to the previous or next source keyframe, to that digit's tenth of the duration, or to its allowed duration endpoint, clamped so it never crosses the other handle or leaves its valid range
+
+#### Scenario: Keyframe navigation without an index
+- **WHEN** the source keyframe index is empty, or no keyframe exists in the requested direction, and the user presses `Alt+Left` or `Alt+Right`
+- **THEN** neither the playhead nor any boundary moves, and the webview does not navigate history
+
+#### Scenario: One target per keypress
+- **WHEN** a trim handle has keyboard focus and the user presses a navigation key
+- **THEN** only that boundary changes, and the playhead is not separately moved by the same keypress
 
 #### Scenario: Invoke primary actions
 - **WHEN** the editor has focus and the user presses `Enter`, `Escape`, or `Ctrl+O`
