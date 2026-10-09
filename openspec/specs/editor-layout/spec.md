@@ -119,3 +119,18 @@ Every border that the editor gives a token color (accent, danger, or a neutral s
 #### Scenario: Selected middle segment
 - **WHEN** a middle option of a segmented control is selected
 - **THEN** the accent outline is continuous along all four sides of that option
+
+### Requirement: Non-selectable interface
+Interface text and images SHALL NOT be selectable with the pointer, so that drags anywhere in the editor do not highlight content. Text inputs SHALL remain editable and selectable, and the header's file name and directory SHALL remain selectable so the path can be copied.
+
+#### Scenario: Drag over interface chrome
+- **WHEN** the user drags across the transport bar, sidebar labels, or timeline
+- **THEN** no text or image becomes highlighted
+
+#### Scenario: Copy the file path
+- **WHEN** a video is loaded and the user drag-selects the header's file name or directory
+- **THEN** that text is highlighted and can be copied
+
+#### Scenario: Edit a text field
+- **WHEN** the user selects text inside the output file name field or a boundary time field
+- **THEN** the text is selected and editable as before

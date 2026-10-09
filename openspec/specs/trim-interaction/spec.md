@@ -161,3 +161,22 @@ While the user seeks continuously (dragging on the timeline, dragging a trim han
 #### Scenario: Single seek
 - **WHEN** the user clicks once on the timeline
 - **THEN** exactly one preview seek runs, to the clicked position
+
+### Requirement: Uninterrupted timeline drag
+A drag that starts on the timeline track or on a trim handle SHALL NOT select text or images, and SHALL NOT start a native image drag. A drag that starts on the track SHALL keep scrubbing until the pointer button is released, even when the pointer crosses a trim handle or leaves the track; positions beyond the track SHALL clamp to `0` or the duration. Pressing a trim handle SHALL NOT seek.
+
+#### Scenario: Scrub across thumbnails and labels
+- **WHEN** the user presses on the timeline track and drags across the thumbnails and ruler labels
+- **THEN** nothing becomes highlighted and the playhead follows the pointer
+
+#### Scenario: Scrub over a trim handle
+- **WHEN** a drag that started on the track passes over the start or end handle
+- **THEN** scrubbing continues and neither trim boundary moves
+
+#### Scenario: Scrub past the track edge
+- **WHEN** a drag that started on the track leaves the track to the left or right while the button is held
+- **THEN** the playhead clamps to the start or end of the media and scrubbing resumes when the pointer comes back
+
+#### Scenario: Press a trim handle
+- **WHEN** the user presses a trim handle without moving
+- **THEN** no seek to the pressed position runs from the track
