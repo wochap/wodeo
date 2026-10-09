@@ -44,8 +44,45 @@ Interactive states are themed, never browser defaults: give every interactive el
 | `.dialog-backdrop` + `.dialog` (+ `.dialog-title/-body/-actions`) | A modal at the top elevation | components/dialog.html |
 | `.hr` | A horizontal rule — present, but this system prefers whitespace; avoid it | — |
 | `.lighten` | The image wrapper — every content photograph goes through it | foundations/image.html |
+| `.kbd`, `.keys` | A key cap; `.keys` groups a chord or pair (`Shift` `←` `→`). The only way to draw a key | Video Trimmer 4a–4c |
+| `.keyhint` + `.keyhint-label` (`data-p="3"` = drops early) | Key(s) + short label; label hides when space runs out, put the full meaning in `title` | Video Trimmer 4a |
+| `.keybar` + `.keybar-row` (`data-mode="handle"`), `.keybar-mode`, `.btn.keybar-more` + `.keybar-more-label` | The always-on shortcut layer in the transport bar; a container that degrades by its own width; the `?` button never drops | Video Trimmer 4a, 4b |
+| `.keyref` + `-head/-heading/-grid/-col/-group/-title/-note/-row/-act/-scope` (`data-scope="handle"`) | The full shortcut reference popover, grouped Playback · Navigate · Trim · Actions | Video Trimmer 4c |
 
 States are built in: hovers and pressed states come from the accent ramp, keyboard focus is the 2px accent `:focus-visible` ring, `::selection` is an accent tint, and disabled controls drop to 45% opacity. Don't restyle them per page. The accent-to-ground pair is tuned to at least 3:1 — enough for icons, large text and interface chrome, not for body copy — so for paragraph-size text in the accent use a deep ramp step (`--color-accent-300` on this ground) rather than the accent itself.
+
+## Keyboard shortcuts
+
+One home, two layers. **The key bar** (`.keybar`) sits at the right end of the transport bar and shows at most four keys — Space, ←/→, I/O, and `?` for everything else. Enter and Esc ride on the Trim & save / Cancel buttons themselves as `.kbd` caps. **The reference** (`.keyref`) is a popover anchored above the `?` button: press `?` or click *All keys*; `?` or Esc closes. It is the only complete list.
+
+Degradation is by the key bar's own width (container queries, so it doesn't care why space is short): >360px key + label · ≤360px keys only · ≤236px I/O and the *All keys* label drop · ≤132px only `?`. With the 320px sidebar that is roughly: 1280px window still labelled, ~1160 keys only, ~1040 Space + ←/→, 900 `?` only. Nothing vanishes without a path to it.
+
+Handle mode: when a trim handle has keyboard focus, set `data-mode="handle"` on `.keybar-row` and swap its hints to the handle set (←/→, Shift, Alt) behind a `.keybar-mode` label ("In handle" / "Out handle"); a small tip on the handle itself shows its timecode and Home/End. In the reference, rows that act on the focused handle carry `.keyref-scope[data-scope="handle"]` (solid accent dot); playhead scope is the hollow dot. The Navigate group acts on either, and says so once in its note.
+
+Hint text contrast (WCAG AA needs 4.5:1 at these sizes; key caps sit on transparent so they take the ground beneath — bg in the transport and timeline, surface in the sidebar and the reference):
+
+| Text | Mocha on bg | Mocha on surface | Latte on bg | Latte on surface |
+| --- | --- | --- | --- | --- |
+| Key cap text `.kbd` (neutral-300) | 9.3:1 | 7.1:1 | 7.1:1 | 6.6:1 |
+| Hint label `.keyhint` (neutral-400) | 7.4:1 | 5.6:1 | 7.1:1 | 6.6:1 |
+| Reference title / note / scope (neutral-400) | 7.4:1 | 5.6:1 | 7.1:1 | 6.6:1 |
+| Handle-mode label `.keybar-mode`, reference rows (text) | 11.3:1 | 8.7:1 | 7.1:1 | 6.6:1 |
+
+Removed — drop from the app:
+- The transport-bar chip row (inline-styled Space / , . / I O spans) that was hidden below 1320px. Replaced by `.keybar`.
+- The sidebar shortcut hint labels. The sidebar no longer carries hints; Enter/Esc live on its two buttons.
+- Inline-styled key caps everywhere (font:500 10.5px mono + divider border). Use `.kbd`.
+- Stray bindings from the retired explorations: `,` `.` for frame step, `[` `]` for in/out, `⌘↵` for trim. The set is ←/→, I/O, Enter.
+
+## Product screens (wodeo)
+
+What the shipped app uses — everything else was removed:
+
+- `Video Trimmer.dc.html` — section 3 *Video Trimmer · screens*: 3a Empty · 3b Inspecting · 1a Loaded (portrait) · 3c Loaded (landscape) · 3d Trimming. Section 4 *Shortcuts*: 4a key bar by window width · 4b handle focused · 4c reference open.
+- `App Icon.dc.html` — 2a Clip at 256 → 16 px, on dark and light grounds; drawn by `AppIcon.dc.html` (one prop: `size`).
+- `Theme Check.dc.html` — Mocha / Latte toggle over both pages.
+
+Retired: Video Trimmer 1b Timecode console and 1c Lens; App Icon 2b Bracket and 2c Lens (and the AppIcon `variant` prop).
 
 ## Do
 
