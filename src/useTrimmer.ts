@@ -68,6 +68,7 @@ export function useTrimmer() {
     [playhead, setPlayhead] = useState(0),
     [playing, setPlaying] = useState(false),
     [previewOk, setPreviewOk] = useState(false),
+    [frameReady, setFrameReady] = useState(false),
     [progress, setProgress] = useState<ExportProgress | null>(null),
     [inspection, setInspection] = useState<Inspection>(NO_INSPECTION),
     [confirm, setConfirm] = useState(false),
@@ -139,6 +140,7 @@ export function useTrimmer() {
         setEnd(next.durationMicros);
         setPlayhead(0);
         setPreviewOk(false);
+        setFrameReady(false);
         setAcceleration(next.playbackAcceleration);
         setPhase("ready");
       } catch (e) {
@@ -428,6 +430,7 @@ export function useTrimmer() {
   };
   const videoEvents = {
     onLoadedMetadata: () => setPreviewOk(true),
+    onLoadedData: () => setFrameReady(true),
     onError: () => {
       clearBounded();
       resetSeeks();
@@ -500,6 +503,7 @@ export function useTrimmer() {
     playhead,
     playing,
     previewOk,
+    frameReady,
     progress,
     inspection,
     confirm,

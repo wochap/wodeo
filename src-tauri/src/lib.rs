@@ -86,6 +86,16 @@ pub fn run() {
                     std::process::exit(lifecycle::EXIT_STARTUP)
                 });
             app.manage(server);
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(1000));
+                if let Some(window) = handle.get_webview_window("main") {
+                    if !window.is_visible().unwrap_or(false) {
+                        tracing::info!("frontend did not show the window; showing it");
+                        let _ = window.show();
+                    }
+                }
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

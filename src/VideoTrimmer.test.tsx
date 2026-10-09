@@ -40,6 +40,7 @@ vi.mock("@tauri-apps/api/window", () => ({
     }),
     theme: vi.fn().mockResolvedValue("dark"),
     onThemeChanged: vi.fn().mockResolvedValue(() => {}),
+    show: vi.fn().mockResolvedValue(undefined),
   }),
 }));
 vi.mock("@tauri-apps/api/event", () => ({
@@ -375,6 +376,22 @@ describe("video loading shell", () => {
     ).toBeVisible();
     expect(field("File name")).toHaveValue("two_trim");
     expect(field("Save to")).toHaveValue("/clips");
+  });
+  it("hides the video until its first frame is decoded", async () => {
+    const video = await ready(metadata(), false);
+    expect(video).toHaveClass("invisible");
+    fireEvent.loadedMetadata(video);
+    expect(video).toHaveClass("invisible");
+    fireEvent.loadedData(video);
+    expect(video).not.toHaveClass("invisible");
+    h.open.mockResolvedValueOnce("/clips/two.mp4");
+    h.load.mockResolvedValueOnce({
+      ...metadata("/clips/two.mp4"),
+      previewUrl: "http://127.0.0.1:9/media2",
+    });
+    await userEvent.click(screen.getByRole("button", { name: /replace/i }));
+    await screen.findByRole("heading", { name: "two.mp4" });
+    expect(document.querySelector("video")).toHaveClass("invisible");
   });
 });
 describe("output settings", () => {

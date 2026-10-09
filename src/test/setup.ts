@@ -37,6 +37,7 @@ vi.mock("@tauri-apps/api/window", () => ({
     onDragDropEvent: vi.fn().mockResolvedValue(() => {}),
     theme: vi.fn().mockResolvedValue("dark"),
     onThemeChanged: vi.fn().mockResolvedValue(() => {}),
+    show: vi.fn().mockResolvedValue(undefined),
   }),
 }));
 vi.mock("@tauri-apps/api/event", () => ({

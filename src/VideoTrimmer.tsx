@@ -7,6 +7,7 @@ import { EmptyState, Inspecting, VideoStage } from "@/components/Stage";
 import { ThumbnailStrip, Timeline } from "@/components/Timeline";
 import { Transport } from "@/components/Transport";
 import { useTrimmer } from "@/useTrimmer";
+import { cn } from "@/lib/utils";
 export default function VideoTrimmer() {
   const t = useTrimmer();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -43,7 +44,10 @@ export default function VideoTrimmer() {
                 key={video.previewUrl}
                 ref={t.player}
                 src={video.previewUrl}
-                className="max-h-full max-w-full rounded-sm bg-black shadow-sm"
+                className={cn(
+                  "max-h-full max-w-full rounded-sm bg-black shadow-sm",
+                  !t.frameReady && "invisible",
+                )}
                 {...t.videoEvents}
               />
             </VideoStage>
