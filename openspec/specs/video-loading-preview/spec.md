@@ -77,7 +77,7 @@ The system SHALL preview the currently selected file through a loopback HTTP end
 - **THEN** the system revokes or stops using the previous preview and displays the new file
 
 ### Requirement: Seek-friendly preview proxy
-The system SHALL derive a preview proxy from the selected video by re-encoding it into an MP4 with dense keyframes, a leading moov atom, and fresh timing metadata, and SHALL serve that proxy at the loopback media endpoint. The proxy SHALL preserve the source timestamps so that trim positions chosen against the preview remain valid, and export SHALL continue to read the original file.
+The system SHALL derive a preview proxy from the selected video by re-encoding it into an MP4 with dense keyframes, no B-frames, a leading moov atom, and fresh timing metadata, and SHALL serve that proxy at the loopback media endpoint. The proxy SHALL be scaled so that its shorter side is at most 1080 pixels, preserving the aspect ratio and orientation, SHALL never be upscaled, and SHALL have even dimensions. The proxy SHALL preserve the source timestamps so that trim positions chosen against the preview remain valid, and export SHALL continue to read the original file at its original resolution.
 
 #### Scenario: Proxy generation succeeds
 - **WHEN** a valid supported video finishes probing and FFmpeg builds the proxy
@@ -86,6 +86,22 @@ The system SHALL derive a preview proxy from the selected video by re-encoding i
 #### Scenario: Proxy generation fails
 - **WHEN** FFmpeg cannot build the proxy for a probed video
 - **THEN** the system serves the original file at the preview endpoint and records the degraded state
+
+#### Scenario: Large landscape source is capped
+- **WHEN** the source video is 3840×2160
+- **THEN** the proxy is 1920×1080 and its frame timestamps match the source
+
+#### Scenario: Large portrait source is capped on its shorter side
+- **WHEN** the source video is 1080×1920 or 1440×2560
+- **THEN** the proxy's width is at most 1080 pixels, its height keeps the source aspect ratio, and both dimensions are even
+
+#### Scenario: Small source is not upscaled
+- **WHEN** the source video's shorter side is 1080 pixels or less
+- **THEN** the proxy keeps the source dimensions, rounded down to even values
+
+#### Scenario: Export ignores the proxy
+- **WHEN** the user exports a range from a video whose proxy was downscaled
+- **THEN** the export reads the original file and its output resolution follows the selected quality, not the proxy's resolution
 
 ### Requirement: Loopback media streaming
 The loopback preview endpoint SHALL support HTTP Range requests so that playback can start and seek without buffering the entire file, SHALL keep a client connection open for further requests unless the client asks to close it, and SHALL serve nothing other than the currently loaded media's preview proxy (or the file itself when proxy generation fails) and its thumbnails.
@@ -145,26 +161,42 @@ The system SHALL collect the presentation timestamps of the video stream's keyfr
 - **THEN** the editor still enters the ready state with an empty keyframe list and copy exports report the effective start only after export
 
 ### Requirement: Inspection progress reporting
-The system SHALL report inspection as an ordered sequence of named steps (`Reading container`, `Indexing keyframes`, `Building preview`, `Building thumbnails`) with a completion fraction, and the editor SHALL show completed, active, and pending steps with a progress bar while inspecting.
+The system SHALL report inspection as an ordered sequence of named steps (`Reading container`, `Indexing keyframes`, `Building preview`) with a completion fraction, and the editor SHALL show completed, active, and pending steps with a progress bar while inspecting. Thumbnail generation SHALL NOT be an inspection step that gates the ready state; it SHALL run alongside proxy generation and continue after the editor becomes ready.
 
 #### Scenario: Step advances
 - **WHEN** the container probe finishes and keyframe indexing starts
 - **THEN** the editor marks `Reading container` complete and `Indexing keyframes` active
 
+#### Scenario: Preview finishes before thumbnails
+- **WHEN** the preview proxy is ready while thumbnails are still being generated
+- **THEN** inspection completes, the editor enters the ready state, and the thumbnails keep arriving in the timeline
+
 #### Scenario: Step fails
-- **WHEN** a non-fatal step such as thumbnail generation fails
+- **WHEN** a non-fatal step such as proxy generation fails, or thumbnail generation fails
 - **THEN** the remaining steps still complete, the editor enters the ready state, and the degraded state is reported as today
 
 ### Requirement: Progressive thumbnails
-The system SHALL deliver each generated thumbnail to the editor as soon as it is written, and the timeline strip SHALL fill from left to right while the remaining cells show placeholders.
+The system SHALL generate thumbnails with at most four concurrent FFmpeg processes, SHALL deliver each generated thumbnail to the editor, tagged with its load id and index, as soon as it is written, both before and after the editor becomes ready, and the timeline strip SHALL show each thumbnail in its cell while the remaining cells show placeholders. When generation finishes, the system SHALL send one completion signal for the load carrying the final ordered thumbnail list and any thumbnail warning, and SHALL make that list available to the loopback thumbnail endpoint.
 
 #### Scenario: Thumbnails arrive
-- **WHEN** the fifth of fourteen thumbnails is written
-- **THEN** the strip shows five images and nine placeholders
+- **WHEN** five of fourteen thumbnails are written
+- **THEN** the strip shows those five images in their cells and nine placeholders
+
+#### Scenario: Thumbnails arrive after the editor is ready
+- **WHEN** the editor is ready and a further thumbnail for the current load is written
+- **THEN** the strip shows it without interrupting playback, seeking, or the trim selection
+
+#### Scenario: Thumbnail generation completes
+- **WHEN** the last thumbnail for the current load is written
+- **THEN** the editor receives the completion signal with the full ordered list, and the loopback thumbnail endpoint serves every listed thumbnail
+
+#### Scenario: Thumbnail generation fails after ready
+- **WHEN** thumbnail generation for the current load fails after the editor is ready
+- **THEN** the completion signal carries the warning, the timeline falls back to the non-thumbnail strip, and playback and trimming are unaffected
 
 #### Scenario: Load replaced mid-inspection
-- **WHEN** the user opens another file before inspection completes
-- **THEN** thumbnails from the previous file are discarded and never appear in the new strip
+- **WHEN** the user opens another file before inspection or thumbnail generation for the previous file completes
+- **THEN** the previous file's thumbnail jobs are cancelled or their results are ignored, their thumbnails and completion signal never appear in the new strip, and the previous cache directory is removed only after its jobs have stopped writing to it
 
 ### Requirement: Preview revealed at first frame
 The system SHALL keep the preview video element in the layout but visually hidden from the moment it is mounted until its first frame is available (the media element's `loadeddata` event), so that no default-sized placeholder box or empty black frame is shown. The element MUST remain in the layout while hidden so that loading and decoding are not throttled. Revealing the video SHALL NOT change when playback and trim controls become enabled, which remains tied to the media's metadata being available.
@@ -184,3 +216,18 @@ The system SHALL keep the preview video element in the layout but visually hidde
 #### Scenario: Replace a loaded video
 - **WHEN** a different video replaces the loaded one
 - **THEN** the new video element is again hidden until its own first frame is available
+
+### Requirement: Per-load preview URL
+The system SHALL give every load a distinct preview URL by adding the load id as a query parameter to the loopback media endpoint (`/media?load=<id>`), and the loopback server SHALL route requests by path while ignoring the query string. The editor SHALL treat a new preview URL as a new media source.
+
+#### Scenario: Replacing a video changes the preview URL
+- **WHEN** the user loads one video and then replaces it with another
+- **THEN** the second load's preview URL differs from the first, the video element is remounted for the new source, and any queued or in-flight seek from the previous video is discarded
+
+#### Scenario: Query string is ignored for routing
+- **WHEN** a client requests `/media?load=7` while a file is loaded
+- **THEN** the server serves the current preview media exactly as for `/media`
+
+#### Scenario: Unknown path with a query
+- **WHEN** a client requests `/other?load=7`
+- **THEN** the server responds 404 and serves no content

@@ -9,8 +9,8 @@ Define the editor workspace, precise range selection, accessibility, and cancell
 The system SHALL display the video prominently above a transport bar and a compact thumbnail timeline containing a ruler, a playhead, start handle, end handle, current selection, and time labels, with a settings sidebar holding the selection fields, output options, `Cancel`, and `Trim & save`.
 
 #### Scenario: Editor becomes ready
-- **WHEN** a video's metadata, preview, and initial timeline are available
-- **THEN** the trim range spans the full video and the workspace shows the video, transport, timeline, sidebar, `Cancel`, and `Trim & save`
+- **WHEN** a video's metadata and preview are available, whether or not its thumbnails have finished generating
+- **THEN** the trim range spans the full video and the workspace shows the video, transport, timeline (with placeholders for thumbnails not yet written), sidebar, `Cancel`, and `Trim & save`
 
 ### Requirement: Complete mouse operation
 The system SHALL allow playback, seeking, range selection, cancellation, and export initiation using only a pointing device.
