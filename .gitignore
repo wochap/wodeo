@@ -45,3 +45,5 @@ design/**/*.webp
 design/**/*.png
 design/**/*.jpg
 .thumbnail
+
+result
