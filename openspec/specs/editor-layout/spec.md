@@ -65,7 +65,7 @@ The sidebar SHALL provide a `Format` control with `MP4`, `WebM`, `GIF`, and `Cop
 - **THEN** `Save to` shows that directory and the next trim writes there
 
 ### Requirement: Sidebar footer and status
-The sidebar footer SHALL show a status line, a `Cancel` action, and a `Trim & save` action. The status line SHALL describe the effect of the selected format: re-encoding formats read as frame-exact, copy reads as fast without re-encoding with the start moved to the nearest keyframe.
+The sidebar footer SHALL show a status line, a `Cancel` action carrying an `Esc` key cap, and a `Trim & save` action carrying an `Enter` key cap. The sidebar SHALL NOT show any other shortcut hints. The status line SHALL describe the effect of the selected format: re-encoding formats read as frame-exact, copy reads as fast without re-encoding with the start moved to the nearest keyframe.
 
 #### Scenario: Copy selected with keyframe index
 - **WHEN** `Copy` is selected, the selection starts at 2.500 s, and the preceding keyframe is at 2.190 s
@@ -74,6 +74,10 @@ The sidebar footer SHALL show a status line, a `Cancel` action, and a `Trim & sa
 #### Scenario: Trim saved while staying open
 - **WHEN** an export succeeds and the on-done policy is `stay`
 - **THEN** the footer shows `Saved <path>` and the editor returns to the ready state with the same selection
+
+#### Scenario: Footer action key caps
+- **WHEN** the editor is ready
+- **THEN** the `Cancel` action shows an `Esc` key cap and the `Trim & save` action shows an `Enter` key cap, both in the shared key cap style
 
 ### Requirement: Trimming state
 The editor SHALL, during export, cover the workspace with a blurred modal showing the destination, the percent complete, the current attempt label, an `Esc` hint, and a `Cancel trim` action.

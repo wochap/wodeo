@@ -28,7 +28,7 @@ The system SHALL allow playback, seeking, range selection, cancellation, and exp
 - **THEN** the preview toggles between playing and paused
 
 ### Requirement: Complete keyboard operation
-The system SHALL allow every trimming workflow action using the keyboard, SHALL avoid overriding keystrokes used by a focused native dialog or text-like control, and SHALL display the active shortcuts as hint chips in the transport bar. Navigation keys SHALL act on the focused trim handle when one has keyboard focus, and on the playhead otherwise. A single keypress MUST NOT move both a trim handle and the playhead.
+The system SHALL allow every trimming workflow action using the keyboard, SHALL avoid overriding keystrokes used by a focused native dialog or text-like control, and SHALL surface the shortcuts through the transport key bar and the `?` shortcut reference (see `keyboard-shortcut-hints`). Navigation keys SHALL act on the focused trim handle when one has keyboard focus, and on the playhead otherwise. A single keypress MUST NOT move both a trim handle and the playhead.
 
 #### Scenario: Playback and seek shortcuts
 - **WHEN** the editor has focus, no trim handle is focused, and the user presses `Space`, `Left`, `Right`, `Shift+Left`, or `Shift+Right`
@@ -55,12 +55,20 @@ The system SHALL allow every trimming workflow action using the keyboard, SHALL 
 - **THEN** only that boundary changes, and the playhead is not separately moved by the same keypress
 
 #### Scenario: Invoke primary actions
-- **WHEN** the editor has focus and the user presses `Enter`, `Escape`, or `Ctrl+O`
+- **WHEN** the editor has focus, the shortcut reference is closed, and the user presses `Enter`, `Escape`, or `Ctrl+O`
 - **THEN** the system respectively initiates a valid trim, requests cancellation/exit, or opens the input picker
 
-#### Scenario: Hint chips
+#### Scenario: Open the shortcut reference
+- **WHEN** the editor has focus, no text-like control is focused, and the user presses `?`
+- **THEN** the system toggles the shortcut reference
+
+#### Scenario: Escape with the reference open
+- **WHEN** the shortcut reference is open and the user presses `Escape`
+- **THEN** the system closes the reference and does not request cancellation or exit
+
+#### Scenario: Key bar instead of hint chips
 - **WHEN** the editor is ready
-- **THEN** the transport bar lists `Space`, `←`/`→`, `Shift`, `I`/`O`, and `Enter` with their actions
+- **THEN** the transport bar shows the key bar (`Space` Play, `←` `→` Frame, `I` `O` In / out, `?` All keys) and no longer shows the `Shift` 1 s or `Enter` Trim chips
 
 ### Requirement: Accessible timeline semantics
 The system MUST expose the trim boundaries as independently focusable, labelled slider controls and SHALL announce changing times, validation errors, export progress, and completion through accessible status semantics.
