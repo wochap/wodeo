@@ -2,8 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
-import { convertFileSrc } from "@tauri-apps/api/core";
-import { backend } from "@/lib/backend";
+import { backend, thumbnailSrc } from "@/lib/backend";
 import { defaultOutput, joinOutput, splitOutput } from "@/lib/output";
 import {
   clampRange,
@@ -19,15 +18,20 @@ import type {
   InspectProgress,
   InspectStep,
   InspectThumbnail,
+  InspectThumbnailsDone,
   LaunchOptions,
   VideoMetadata,
 } from "@/lib/types";
 export type Phase = "empty" | "loading" | "ready" | "exporting" | "error";
-/** Advisory inspection state; `thumbnails` holds `null` for cells not yet written. */
+/**
+ * Advisory inspection state. `thumbnails` stays live after the editor is
+ * ready and holds `null` for cells not yet written.
+ */
 export interface Inspection {
   step: InspectStep | null;
   fraction: number;
   thumbnails: (string | null)[];
+  thumbnailWarning?: string;
 }
 const NO_INSPECTION: Inspection = { step: null, fraction: 0, thumbnails: [] };
 const supported = (p: string, extensions: string[]) => {
@@ -89,6 +93,9 @@ export function useTrimmer() {
     // active load may update state, so a replaced load can never leak in.
     loadCounter = useRef(0),
     activeLoad = useRef(0),
+    // Thumbnails keep arriving after ready, so they follow their own load id.
+    thumbnailLoad = useRef(0),
+    inspectionRef = useRef(inspection),
     // `--output` names only the first loaded input; replacements derive their own.
     launchOutput = useRef<string | null>(null),
     // Read through a ref so a load started from the launch handler sees it.
@@ -100,6 +107,7 @@ export function useTrimmer() {
     // `pendingSeek` and is applied on `seeked`.
     seekInFlight = useRef(false),
     pendingSeek = useRef<number | null>(null);
+  inspectionRef.current = inspection;
   const step = frameStepMicros(video?.frameRate ?? 30);
   const outputPath =
     video && outputStem.trim()
@@ -119,7 +127,12 @@ export function useTrimmer() {
       boundedSeekTarget.current = null;
       boundedVersion.current += 1;
       const id = ++loadCounter.current;
+      const previous = {
+        inspection: inspectionRef.current,
+        thumbnailLoad: thumbnailLoad.current,
+      };
       activeLoad.current = id;
+      thumbnailLoad.current = id;
       setInspection(NO_INSPECTION);
       setPhase("loading");
       setPendingPath(path);
@@ -142,10 +155,18 @@ export function useTrimmer() {
         setPreviewOk(false);
         setFrameReady(false);
         setAcceleration(next.playbackAcceleration);
+        setInspection((s) => ({
+          ...s,
+          thumbnails: s.thumbnails.length ? s.thumbnails : next.thumbnails,
+          thumbnailWarning: next.thumbnailWarning ?? s.thumbnailWarning,
+        }));
         setPhase("ready");
       } catch (e) {
         if (activeLoad.current !== id) return;
         activeLoad.current = 0;
+        // The previous video stays open, so its strip does too.
+        thumbnailLoad.current = previous.thumbnailLoad;
+        setInspection({ ...previous.inspection, step: null, fraction: 0 });
         setError(errorMessage(e));
         setPhase(video ? "ready" : "error");
       } finally {
@@ -226,16 +247,27 @@ export function useTrimmer() {
         setInspection((s) => ({ ...s, step: p.step, fraction: p.fraction }));
       }),
       listen<InspectThumbnail>("inspect-thumbnail", ({ payload: t }) => {
-        if (t.loadId !== activeLoad.current) return;
+        if (t.loadId !== thumbnailLoad.current) return;
         setInspection((s) => {
           const thumbnails = Array.from(
             { length: t.count },
             (_, i) => s.thumbnails[i] ?? null,
           );
-          thumbnails[t.index] = convertFileSrc(t.path);
+          thumbnails[t.index] = thumbnailSrc(t.path);
           return { ...s, thumbnails };
         });
       }),
+      listen<InspectThumbnailsDone>(
+        "inspect-thumbnails-done",
+        ({ payload: d }) => {
+          if (d.loadId !== thumbnailLoad.current) return;
+          setInspection((s) => ({
+            ...s,
+            thumbnails: d.thumbnails.map(thumbnailSrc),
+            thumbnailWarning: d.warning ?? undefined,
+          }));
+        },
+      ),
     ];
     return () => {
       for (const p of stops) void p.then((u) => u());

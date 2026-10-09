@@ -78,7 +78,6 @@ export const INSPECT_STEPS = [
   "Reading container",
   "Indexing keyframes",
   "Building preview",
-  "Building thumbnails",
 ] as const;
 export type InspectStep = (typeof INSPECT_STEPS)[number];
 /** Advisory `inspect-progress` event; the `load_input` result stays final. */
@@ -93,4 +92,10 @@ export interface InspectThumbnail {
   index: number;
   count: number;
   path: string;
+}
+/** `inspect-thumbnails-done` event: the final ordered list, or `[]` and a warning. */
+export interface InspectThumbnailsDone {
+  loadId: number;
+  thumbnails: string[];
+  warning: string | null;
 }

@@ -9,9 +9,11 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
     sync::{
-        atomic::{AtomicU64, Ordering},
-        Mutex,
+        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+        Arc, Mutex,
     },
+    thread::{self, JoinHandle},
+    time::{Duration, Instant},
 };
 use tauri::{Emitter, Manager};
 #[derive(Default)]
@@ -22,13 +24,63 @@ pub struct MediaState {
 pub struct CurrentMedia {
     pub preview: PathBuf,
     pub cache: PathBuf,
-    pub thumbnails: Vec<PathBuf>,
+    /// The thumbnail job's slots, so `/thumb/<i>` serves files as they land.
+    pub thumbnails: ThumbnailSlots,
+    pub job: Option<ThumbnailJob>,
 }
-fn replace_current(current: &mut Option<CurrentMedia>, next: CurrentMedia) {
-    if let Some(old) = current.take() {
-        let _ = fs::remove_dir_all(old.cache);
+/// Thumbnail paths by index; `None` until that file is written.
+pub type ThumbnailSlots = Arc<Mutex<Vec<Option<PathBuf>>>>;
+fn lock_slots(slots: &ThumbnailSlots) -> std::sync::MutexGuard<'_, Vec<Option<PathBuf>>> {
+    slots.lock().unwrap_or_else(|e| e.into_inner())
+}
+/// Thumbnail generation for one load, running beside the proxy encode.
+pub struct ThumbnailJob {
+    pub load_id: u64,
+    cancel: Arc<AtomicBool>,
+    pub slots: ThumbnailSlots,
+    handle: JoinHandle<()>,
+}
+impl ThumbnailJob {
+    pub fn cancel(&self) {
+        self.cancel.store(true, Ordering::SeqCst);
     }
+    pub fn join(self) {
+        let _ = self.handle.join();
+    }
+    /// Waits up to `limit` for the job to stop; returns whether it did.
+    pub fn join_within(self, limit: Duration) -> bool {
+        let deadline = Instant::now() + limit;
+        while !self.handle.is_finished() {
+            if Instant::now() >= deadline {
+                return false;
+            }
+            thread::sleep(Duration::from_millis(20));
+        }
+        let _ = self.handle.join();
+        true
+    }
+}
+// Cancels a superseded load's job and removes its cache only after the job
+// has stopped writing into it, on a thread so the caller never waits.
+fn retire(job: Option<ThumbnailJob>, cache: PathBuf) -> JoinHandle<()> {
+    if let Some(job) = &job {
+        tracing::debug!(load_id = job.load_id, "cancelling superseded thumbnail job");
+        job.cancel();
+    }
+    thread::spawn(move || {
+        if let Some(job) = job {
+            job.join();
+        }
+        let _ = fs::remove_dir_all(cache);
+    })
+}
+fn replace_current(
+    current: &mut Option<CurrentMedia>,
+    next: CurrentMedia,
+) -> Option<JoinHandle<()>> {
+    let retired = current.take().map(|old| retire(old.job, old.cache));
     *current = Some(next);
+    retired
 }
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -242,35 +294,28 @@ pub const THUMBNAIL_COUNT: u64 = 14;
 fn thumbnail_count(duration: u64) -> u64 {
     THUMBNAIL_COUNT.min((duration / 1_000_000).max(1))
 }
+pub const THUMBNAIL_WORKERS: usize = 4;
+/// Writes one thumbnail at `seconds` into `file`; injectable for tests.
+pub type ThumbnailSpawner = Arc<dyn Fn(&Path, f64, &Path) -> Result<(), String> + Send + Sync>;
 // One FFmpeg spawn per timestamp so each frame can be reported as soon as it
 // exists; `-ss` before `-i` keeps every seek cheap on long files.
-fn thumbnails_per_file(
-    path: &Path,
-    duration: u64,
-    dir: &Path,
-    on_file: &mut dyn FnMut(usize, usize, &Path),
-) -> Result<Vec<String>, String> {
-    let count = thumbnail_count(duration) as usize;
-    let interval = duration as f64 / 1_000_000.0 / count as f64;
-    let mut files = Vec::with_capacity(count);
-    for index in 0..count {
-        let file = dir.join(format!("frame-{:02}.jpg", index + 1));
-        let status = Command::new("ffmpeg")
-            .args(["-hide_banner", "-nostdin", "-loglevel", "error", "-ss"])
-            .arg(format!("{:.6}", interval * (index as f64 + 0.5)))
-            .arg("-i")
-            .arg(path)
-            .args(["-frames:v", "1", "-vf", "scale=240:-2", "-q:v", "4", "-y"])
-            .arg(&file)
-            .status()
-            .map_err(|e| e.to_string())?;
-        if !status.success() || !file.is_file() {
-            return Err(format!("FFmpeg could not write thumbnail {}", index + 1));
-        }
-        on_file(index, count, &file);
-        files.push(file.to_string_lossy().into_owned());
+fn thumbnail_file(path: &Path, seconds: f64, file: &Path) -> Result<(), String> {
+    let status = Command::new("ffmpeg")
+        .args(["-hide_banner", "-nostdin", "-loglevel", "error", "-ss"])
+        .arg(format!("{seconds:.6}"))
+        .arg("-i")
+        .arg(path)
+        .args(["-frames:v", "1", "-vf", "scale=240:-2", "-q:v", "4", "-y"])
+        .arg(file)
+        .status()
+        .map_err(|e| e.to_string())?;
+    if !status.success() || !file.is_file() {
+        return Err(format!(
+            "FFmpeg could not write thumbnail {}",
+            file.display()
+        ));
     }
-    Ok(files)
+    Ok(())
 }
 // Single-invocation fallback used when per-file generation fails.
 fn thumbnails_batch(path: &Path, duration: u64, dir: &Path) -> Result<Vec<String>, String> {
@@ -303,39 +348,152 @@ fn thumbnails_batch(path: &Path, duration: u64, dir: &Path) -> Result<Vec<String
     files.sort();
     Ok(files)
 }
-fn thumbnails(
+// A pool of `THUMBNAIL_WORKERS` threads takes indices from a shared counter;
+// any per-file failure stops the pool and falls back to one batch run.
+#[allow(clippy::too_many_arguments)]
+fn run_thumbnails(
     path: &Path,
     duration: u64,
     dir: &Path,
-    on_file: &mut dyn FnMut(usize, usize, &Path),
-) -> Result<Vec<String>, String> {
-    if dir.exists() {
-        fs::remove_dir_all(dir).map_err(|e| e.to_string())?
-    }
-    fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-    match thumbnails_per_file(path, duration, dir, on_file) {
-        Ok(files) => Ok(files),
-        Err(e) => {
-            tracing::warn!(reason = %e, "per-file thumbnails failed; using the batch path");
-            let _ = fs::remove_dir_all(dir);
-            fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-            let files = thumbnails_batch(path, duration, dir).inspect_err(|_| {
-                let _ = fs::remove_dir_all(dir);
-            })?;
-            for (index, file) in files.iter().enumerate() {
-                on_file(index, files.len(), Path::new(file));
-            }
-            Ok(files)
+    load_id: u64,
+    cancel: &AtomicBool,
+    slots: &ThumbnailSlots,
+    emit: &(dyn Fn(InspectEvent) + Send + Sync),
+    spawner: &ThumbnailSpawner,
+) {
+    let count = lock_slots(slots).len();
+    let interval = duration as f64 / 1_000_000.0 / count as f64;
+    let report = |index: usize, file: &Path| {
+        lock_slots(slots)[index] = Some(file.to_path_buf());
+        if !cancel.load(Ordering::SeqCst) {
+            emit(InspectEvent::Thumbnail(InspectThumbnail {
+                load_id,
+                index,
+                count,
+                path: file.to_string_lossy().into_owned(),
+            }));
         }
+    };
+    let next = AtomicUsize::new(0);
+    let failure = Mutex::new(None::<String>);
+    thread::scope(|scope| {
+        for _ in 0..THUMBNAIL_WORKERS.min(count) {
+            scope.spawn(|| loop {
+                if cancel.load(Ordering::SeqCst) || failure.lock().is_ok_and(|f| f.is_some()) {
+                    return;
+                }
+                let index = next.fetch_add(1, Ordering::SeqCst);
+                if index >= count {
+                    return;
+                }
+                let file = dir.join(format!("frame-{:02}.jpg", index + 1));
+                match spawner(path, interval * (index as f64 + 0.5), &file) {
+                    Ok(()) => report(index, &file),
+                    Err(e) => {
+                        if let Ok(mut f) = failure.lock() {
+                            f.get_or_insert(e);
+                        }
+                        return;
+                    }
+                }
+            });
+        }
+    });
+    if cancel.load(Ordering::SeqCst) {
+        return;
+    }
+    let failure = failure.into_inner().unwrap_or_else(|e| e.into_inner());
+    let result = match failure {
+        None => Ok(()),
+        Some(e) => {
+            tracing::warn!(reason = %e, "per-file thumbnails failed; using the batch path");
+            lock_slots(slots).iter_mut().for_each(|s| *s = None);
+            let _ = fs::remove_dir_all(dir);
+            fs::create_dir_all(dir)
+                .map_err(|e| e.to_string())
+                .and_then(|_| thumbnails_batch(path, duration, dir))
+                .map(|files| {
+                    lock_slots(slots).resize(files.len(), None);
+                    for (index, file) in files.iter().enumerate() {
+                        report(index, Path::new(file));
+                    }
+                })
+                .inspect_err(|_| {
+                    lock_slots(slots).clear();
+                    let _ = fs::remove_dir_all(dir);
+                })
+        }
+    };
+    if cancel.load(Ordering::SeqCst) {
+        return;
+    }
+    let (thumbnails, warning) = match result {
+        Ok(()) => (
+            lock_slots(slots)
+                .iter()
+                .flatten()
+                .map(|p| p.to_string_lossy().into_owned())
+                .collect(),
+            None,
+        ),
+        Err(e) => (vec![], Some(e)),
+    };
+    emit(InspectEvent::ThumbnailsDone(InspectThumbnailsDone {
+        load_id,
+        thumbnails,
+        warning,
+    }));
+}
+pub fn start_thumbnail_job(
+    path: &Path,
+    duration: u64,
+    dir: &Path,
+    load_id: u64,
+    emit: InspectEmitter,
+    spawner: ThumbnailSpawner,
+) -> ThumbnailJob {
+    let count = thumbnail_count(duration) as usize;
+    let cancel = Arc::new(AtomicBool::new(false));
+    let slots: ThumbnailSlots = Arc::new(Mutex::new(vec![None; count]));
+    let (path, dir) = (path.to_path_buf(), dir.to_path_buf());
+    let handle = {
+        let (cancel, slots) = (cancel.clone(), slots.clone());
+        thread::spawn(move || {
+            if let Err(e) = fs::create_dir_all(&dir) {
+                lock_slots(&slots).clear();
+                if !cancel.load(Ordering::SeqCst) {
+                    emit(InspectEvent::ThumbnailsDone(InspectThumbnailsDone {
+                        load_id,
+                        thumbnails: vec![],
+                        warning: Some(e.to_string()),
+                    }));
+                }
+                return;
+            }
+            run_thumbnails(
+                &path, duration, &dir, load_id, &cancel, &slots, &*emit, &spawner,
+            );
+        })
+    };
+    ThumbnailJob {
+        load_id,
+        cancel,
+        slots,
+        handle,
     }
 }
 // Source MP4s often carry sparse keyframes, invalid H.264 levels, or VUI
 // timing that GStreamer's h264parse rejects, all of which make WebKitGTK
 // drop the frames at a seek target and flash black. Re-encoding a proxy
-// with dense keyframes, a leading moov atom, and fresh timing metadata
-// keeps trim-point timestamps intact while making seeks land instantly.
-// `-t` pins the proxy to the probed duration so the player's clock agrees
-// with the timeline even when the source container duration is wrong.
+// with dense keyframes, no B-frames, a leading moov atom, and fresh timing
+// metadata keeps trim-point timestamps intact while making seeks land
+// instantly. The shorter side is capped at 1080 px (never upscaled, even
+// sizes) and encoded with `ultrafast`, which roughly halves the encode time;
+// the proxy is only for previewing, and export always reads the original
+// file at its original resolution. `-t` pins the proxy to the probed
+// duration so the player's clock agrees with the timeline even when the
+// source container duration is wrong.
+const PROXY_SCALE: &str = "scale=w='if(gte(iw,ih),-2,min(trunc(iw/2)*2,1080))':h='if(gte(iw,ih),min(trunc(ih/2)*2,1080),-2)'";
 fn preview_proxy(input: &Path, duration_micros: u64, dir: &Path) -> Result<PathBuf, String> {
     fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     let proxy = dir.join("proxy.mp4");
@@ -351,11 +509,13 @@ fn preview_proxy(input: &Path, duration_micros: u64, dir: &Path) -> Result<PathB
             "-map",
             "0:a?",
             "-vf",
-            "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+            PROXY_SCALE,
             "-c:v",
             "libx264",
             "-preset",
-            "veryfast",
+            "ultrafast",
+            "-bf",
+            "0",
             "-crf",
             "28",
             "-g",
@@ -384,7 +544,6 @@ fn preview_proxy(input: &Path, duration_micros: u64, dir: &Path) -> Result<PathB
 pub const STEP_CONTAINER: &str = "Reading container";
 pub const STEP_KEYFRAMES: &str = "Indexing keyframes";
 pub const STEP_PREVIEW: &str = "Building preview";
-pub const STEP_THUMBNAILS: &str = "Building thumbnails";
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InspectProgress {
@@ -400,16 +559,27 @@ pub struct InspectThumbnail {
     pub count: usize,
     pub path: String,
 }
+/// Sent once per load when thumbnail generation finishes (not when cancelled).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InspectThumbnailsDone {
+    pub load_id: u64,
+    pub thumbnails: Vec<String>,
+    pub warning: Option<String>,
+}
 #[derive(Debug, Clone, PartialEq)]
 pub enum InspectEvent {
     Progress(InspectProgress),
     Thumbnail(InspectThumbnail),
+    ThumbnailsDone(InspectThumbnailsDone),
 }
+/// Shared with the thumbnail workers, so it must be callable from any thread.
+pub type InspectEmitter = Arc<dyn Fn(InspectEvent) + Send + Sync>;
 pub struct Inspected {
     pub metadata: VideoMetadata,
     pub preview: PathBuf,
     pub cache: PathBuf,
-    pub thumbnails: Vec<PathBuf>,
+    pub job: ThumbnailJob,
 }
 fn cache_dir(load_id: u64) -> PathBuf {
     ProjectDirs::from("com", "wochap", "wodeo")
@@ -417,16 +587,17 @@ fn cache_dir(load_id: u64) -> PathBuf {
         .unwrap_or_else(std::env::temp_dir)
         .join(format!("preview-{}-{load_id}", std::process::id()))
 }
-// Runs the inspection steps in the order the editor lists them. Step weights
-// are probe 0.1, keyframes 0.2, preview 0.5, thumbnails 0.2; the thumbnail
-// step advances per written file. Only the probe is fatal.
+// Runs the inspection steps in the order the editor lists them, with weights
+// probe 0.1, keyframes 0.2, preview 0.7. Thumbnails start right after the
+// probe and keep running after this returns. Only the probe is fatal.
 pub fn inspect_input(
     canonical: &Path,
     load_id: u64,
     cache: &Path,
-    emit: &mut dyn FnMut(InspectEvent),
+    emit: InspectEmitter,
+    spawner: ThumbnailSpawner,
 ) -> Result<Inspected, AppError> {
-    let mut progress = |step, fraction| {
+    let progress = |step, fraction| {
         emit(InspectEvent::Progress(InspectProgress {
             load_id,
             step,
@@ -435,45 +606,37 @@ pub fn inspect_input(
     };
     progress(STEP_CONTAINER, 0.0);
     let mut metadata = inspect(canonical, Some(canonical))?;
+    let _ = fs::remove_dir_all(cache);
+    let job = start_thumbnail_job(
+        canonical,
+        metadata.duration_micros,
+        &cache.join("thumbs"),
+        load_id,
+        emit.clone(),
+        spawner,
+    );
     progress(STEP_KEYFRAMES, 0.1);
     metadata.keyframes_micros = keyframes(canonical).unwrap_or_else(|e| {
         tracing::warn!(path = %canonical.display(), reason = %e, "keyframe index unavailable");
         vec![]
     });
     progress(STEP_PREVIEW, 0.3);
-    let _ = fs::remove_dir_all(cache);
     let preview = preview_proxy(canonical, metadata.duration_micros, cache).unwrap_or_else(|e| {
         tracing::warn!(reason = %e, "preview proxy unavailable; serving the original file");
         canonical.to_path_buf()
     });
-    progress(STEP_THUMBNAILS, 0.8);
-    let generated = thumbnails(
-        canonical,
-        metadata.duration_micros,
-        &cache.join("thumbs"),
-        &mut |index, count, file| {
-            emit(InspectEvent::Thumbnail(InspectThumbnail {
-                load_id,
-                index,
-                count,
-                path: file.to_string_lossy().into_owned(),
-            }));
-            emit(InspectEvent::Progress(InspectProgress {
-                load_id,
-                step: STEP_THUMBNAILS,
-                fraction: 0.8 + 0.2 * (index + 1) as f64 / count as f64,
-            }));
-        },
-    );
-    metadata.thumbnails = generated.unwrap_or_else(|e| {
-        metadata.thumbnail_warning = Some(e);
-        vec![]
-    });
+    progress(STEP_PREVIEW, 1.0);
+    // Whatever has landed so far; `inspect-thumbnails-done` is authoritative.
+    metadata.thumbnails = lock_slots(&job.slots)
+        .iter()
+        .flatten()
+        .map(|p| p.to_string_lossy().into_owned())
+        .collect();
     Ok(Inspected {
-        thumbnails: metadata.thumbnails.iter().map(PathBuf::from).collect(),
         metadata,
         preview,
         cache: cache.to_path_buf(),
+        job,
     })
 }
 #[tauri::command]
@@ -487,31 +650,36 @@ pub async fn load_input(
     let canonical = validate_input(Path::new(&path))?;
     state.latest_load.fetch_max(load_id, Ordering::SeqCst);
     let cache = cache_dir(load_id);
-    let inspected = inspect_input(&canonical, load_id, &cache, &mut |event| match event {
+    let handle = app.clone();
+    let emit: InspectEmitter = Arc::new(move |event| match event {
         InspectEvent::Progress(p) => {
-            let _ = app.emit("inspect-progress", p);
+            let _ = handle.emit("inspect-progress", p);
         }
         InspectEvent::Thumbnail(t) => {
             // The webview can only load the file once the asset scope allows it.
-            if let Err(e) = app.asset_protocol_scope().allow_file(&t.path) {
+            if let Err(e) = handle.asset_protocol_scope().allow_file(&t.path) {
                 tracing::warn!(reason = %e, "thumbnail not allowed in asset scope");
                 return;
             }
-            let _ = app.emit("inspect-thumbnail", t);
+            let _ = handle.emit("inspect-thumbnail", t);
         }
-    })
-    .inspect_err(|_| {
-        let _ = fs::remove_dir_all(&cache);
-    })?;
+        InspectEvent::ThumbnailsDone(d) => {
+            let _ = handle.emit("inspect-thumbnails-done", d);
+        }
+    });
+    let inspected = inspect_input(&canonical, load_id, &cache, emit, Arc::new(thumbnail_file))
+        .inspect_err(|_| {
+            let _ = fs::remove_dir_all(&cache);
+        })?;
     let mut metadata = inspected.metadata;
-    metadata.preview_url = preview.media_url().to_owned();
+    metadata.preview_url = format!("{}?load={load_id}", preview.media_url());
     let mut current = state
         .current
         .lock()
         .map_err(|_| AppError::Internal("media state poisoned".into()))?;
     // A newer load already owns the preview; drop this one's files.
     if state.latest_load.load(Ordering::SeqCst) != load_id {
-        let _ = fs::remove_dir_all(&inspected.cache);
+        retire(Some(inspected.job), inspected.cache);
         return Ok(metadata);
     }
     replace_current(
@@ -519,14 +687,21 @@ pub async fn load_input(
         CurrentMedia {
             preview: inspected.preview,
             cache: inspected.cache,
-            thumbnails: inspected.thumbnails,
+            thumbnails: inspected.job.slots.clone(),
+            job: Some(inspected.job),
         },
     );
     Ok(metadata)
 }
+// On exit FFmpeg must never block quitting: wait about 2 s for in-flight
+// thumbnails, then remove the cache regardless.
 pub fn cleanup(state: &MediaState) {
     if let Ok(mut c) = state.current.lock() {
         if let Some(old) = c.take() {
+            if let Some(job) = old.job {
+                job.cancel();
+                job.join_within(Duration::from_secs(2));
+            }
             let _ = fs::remove_dir_all(old.cache);
         };
     }
@@ -708,16 +883,19 @@ mod tests {
         let mut current = Some(CurrentMedia {
             preview: dir.path().join("old.mp4"),
             cache: old_cache.clone(),
-            thumbnails: vec![],
+            thumbnails: Arc::default(),
+            job: None,
         });
-        replace_current(
+        let retired = replace_current(
             &mut current,
             CurrentMedia {
                 preview: input.clone(),
                 cache: dir.path().join("new-cache"),
-                thumbnails: vec![],
+                thumbnails: Arc::default(),
+                job: None,
             },
         );
+        retired.unwrap().join().unwrap();
         assert!(!old_cache.exists());
         assert_eq!(current.as_ref().unwrap().preview, input);
         cleanup(&MediaState {
@@ -822,10 +1000,35 @@ mod tests {
         assert!(status.success());
         source
     }
-    fn collect(source: &Path, load_id: u64, cache: &Path) -> (Inspected, Vec<InspectEvent>) {
-        let mut events = vec![];
-        let inspected = inspect_input(source, load_id, cache, &mut |e| events.push(e)).unwrap();
+    type Events = Arc<Mutex<Vec<InspectEvent>>>;
+    fn recorder() -> (Events, InspectEmitter) {
+        let events: Events = Arc::default();
+        let sink = events.clone();
+        (events, Arc::new(move |e| sink.lock().unwrap().push(e)))
+    }
+    fn collect(source: &Path, load_id: u64, cache: &Path) -> (Inspected, Events) {
+        let (events, emit) = recorder();
+        let inspected =
+            inspect_input(source, load_id, cache, emit, Arc::new(thumbnail_file)).unwrap();
         (inspected, events)
+    }
+    fn thumbnail_events(events: &Events) -> (Vec<InspectThumbnail>, Vec<InspectThumbnailsDone>) {
+        let events = events.lock().unwrap();
+        let thumbs = events
+            .iter()
+            .filter_map(|e| match e {
+                InspectEvent::Thumbnail(t) => Some(t.clone()),
+                _ => None,
+            })
+            .collect();
+        let done = events
+            .iter()
+            .filter_map(|e| match e {
+                InspectEvent::ThumbnailsDone(d) => Some(d.clone()),
+                _ => None,
+            })
+            .collect();
+        (thumbs, done)
     }
     #[test]
     fn inspection_reports_steps_in_order_with_weighted_fractions() {
@@ -833,6 +1036,8 @@ mod tests {
         let source = generated_clip(dir.path(), 3);
         let (inspected, events) = collect(&source, 7, &dir.path().join("cache"));
         let progress = events
+            .lock()
+            .unwrap()
             .iter()
             .filter_map(|e| match e {
                 InspectEvent::Progress(p) => Some(p.clone()),
@@ -842,55 +1047,177 @@ mod tests {
         assert!(progress.iter().all(|p| p.load_id == 7));
         let mut steps = progress.iter().map(|p| p.step).collect::<Vec<_>>();
         steps.dedup();
-        assert_eq!(
-            steps,
-            [
-                STEP_CONTAINER,
-                STEP_KEYFRAMES,
-                STEP_PREVIEW,
-                STEP_THUMBNAILS
-            ]
-        );
+        assert_eq!(steps, [STEP_CONTAINER, STEP_KEYFRAMES, STEP_PREVIEW]);
         let fractions = progress.iter().map(|p| p.fraction).collect::<Vec<_>>();
-        assert_eq!(&fractions[..4], &[0.0, 0.1, 0.3, 0.8]);
-        assert!(fractions.windows(2).all(|w| w[0] <= w[1]));
-        assert!((fractions.last().unwrap() - 1.0).abs() < 1e-9);
+        assert_eq!(fractions, [0.0, 0.1, 0.3, 1.0]);
         assert_ne!(inspected.preview, source);
         assert!(inspected.preview.starts_with(&inspected.cache));
+        inspected.job.join();
     }
     #[test]
-    fn thumbnails_are_reported_one_by_one_and_match_metadata() {
+    fn thumbnails_stream_per_file_and_finish_with_a_done_event() {
         let dir = tempfile::tempdir().unwrap();
         let source = generated_clip(dir.path(), 15);
-        let (inspected, events) = collect(&source, 3, &dir.path().join("cache"));
-        let thumbs = events
-            .iter()
-            .filter_map(|e| match e {
-                InspectEvent::Thumbnail(t) => Some(t.clone()),
-                _ => None,
+        let active = Arc::new(AtomicUsize::new(0));
+        let peak = Arc::new(AtomicUsize::new(0));
+        let spawner: ThumbnailSpawner = {
+            let (active, peak) = (active.clone(), peak.clone());
+            Arc::new(move |path, seconds, file| {
+                let now = active.fetch_add(1, Ordering::SeqCst) + 1;
+                peak.fetch_max(now, Ordering::SeqCst);
+                let result = thumbnail_file(path, seconds, file);
+                active.fetch_sub(1, Ordering::SeqCst);
+                result
             })
-            .collect::<Vec<_>>();
-        assert_eq!(thumbs.len(), 14);
-        assert!(thumbs
-            .iter()
-            .enumerate()
-            .all(|(i, t)| t.index == i && t.count == 14 && t.load_id == 3));
-        assert_eq!(
-            thumbs.iter().map(|t| t.path.clone()).collect::<Vec<_>>(),
-            inspected.metadata.thumbnails
-        );
-        assert!(inspected.thumbnails.iter().all(|p| p.is_file()));
+        };
+        let (events, emit) = recorder();
+        let cache = dir.path().join("cache");
+        let inspected = inspect_input(&source, 3, &cache, emit, spawner).unwrap();
         assert_eq!(inspected.metadata.thumbnail_warning, None);
+        let slots = inspected.job.slots.clone();
+        inspected.job.join();
+        let (thumbs, done) = thumbnail_events(&events);
+        assert_eq!(thumbs.len(), 14);
+        assert!(thumbs.iter().all(|t| t.count == 14 && t.load_id == 3));
+        let mut indices = thumbs.iter().map(|t| t.index).collect::<Vec<_>>();
+        indices.sort_unstable();
+        assert_eq!(indices, (0..14).collect::<Vec<_>>());
+        assert_eq!(done.len(), 1);
+        assert_eq!(done[0].load_id, 3);
+        assert_eq!(done[0].warning, None);
+        let filled = slots
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|p| p.clone().unwrap())
+            .collect::<Vec<_>>();
+        assert!(filled.iter().all(|p| p.is_file()));
+        assert_eq!(
+            done[0].thumbnails,
+            filled
+                .iter()
+                .map(|p| p.to_string_lossy().into_owned())
+                .collect::<Vec<_>>()
+        );
+        let max = peak.load(Ordering::SeqCst);
+        assert!((1..=THUMBNAIL_WORKERS).contains(&max), "peak {max}");
+    }
+    #[test]
+    fn superseded_job_is_cancelled_and_its_cache_removed_after_join() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache = dir.path().join("cache");
+        let thumbs = cache.join("thumbs");
+        let orphaned = Arc::new(AtomicUsize::new(0));
+        let spawner: ThumbnailSpawner = {
+            let orphaned = orphaned.clone();
+            Arc::new(move |_, _, file| {
+                thread::sleep(Duration::from_millis(150));
+                if !file.parent().unwrap().is_dir() {
+                    orphaned.fetch_add(1, Ordering::SeqCst);
+                    return Err("cache removed under the job".into());
+                }
+                fs::write(file, b"jpeg").map_err(|e| e.to_string())
+            })
+        };
+        let (events, emit) = recorder();
+        let job = start_thumbnail_job(
+            Path::new("unused.mp4"),
+            15_000_000,
+            &thumbs,
+            9,
+            emit,
+            spawner,
+        );
+        thread::sleep(Duration::from_millis(50));
+        retire(Some(job), cache.clone()).join().unwrap();
+        assert!(!cache.exists());
+        assert_eq!(orphaned.load(Ordering::SeqCst), 0);
+        let (written, done) = thumbnail_events(&events);
+        assert!(done.is_empty());
+        assert!(written.len() < 14);
     }
     #[test]
     fn inspection_rejects_malformed_media_before_later_steps() {
         let dir = tempfile::tempdir().unwrap();
         let bad = dir.path().join("bad.mp4");
         fs::write(&bad, b"not media").unwrap();
-        let mut events = vec![];
-        let result = inspect_input(&bad, 1, &dir.path().join("cache"), &mut |e| events.push(e));
+        let (events, emit) = recorder();
+        let result = inspect_input(
+            &bad,
+            1,
+            &dir.path().join("cache"),
+            emit,
+            Arc::new(thumbnail_file),
+        );
         assert!(matches!(result, Err(AppError::Probe(_))));
-        assert_eq!(events.len(), 1);
+        assert_eq!(events.lock().unwrap().len(), 1);
+    }
+    fn sized_clip(dir: &Path, w: u32, h: u32) -> PathBuf {
+        let source = dir.join(format!("{w}x{h}.mp4"));
+        let status = Command::new("ffmpeg")
+            .args(["-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i"])
+            .arg(format!("testsrc2=s={w}x{h}:r=10:d=1"))
+            .args([
+                "-an",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "ultrafast",
+                "-pix_fmt",
+                "yuv420p",
+                "-y",
+            ])
+            .arg(&source)
+            .status()
+            .unwrap();
+        assert!(status.success());
+        source
+    }
+    fn stream_field(path: &Path, entries: &str) -> String {
+        let out = Command::new("ffprobe")
+            .args([
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                entries,
+            ])
+            .args(["-of", "csv=p=0"])
+            .arg(path)
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+        String::from_utf8_lossy(&out.stdout).trim().to_owned()
+    }
+    fn proxy_of(dir: &Path, source: &Path) -> PathBuf {
+        let cache = dir.join(source.file_stem().unwrap());
+        preview_proxy(source, 1_000_000, &cache).unwrap()
+    }
+    #[test]
+    fn preview_proxy_caps_the_shorter_side_at_1080() {
+        let dir = tempfile::tempdir().unwrap();
+        for ((w, h), expected) in [
+            ((3840, 2160), (1920, 1080)),
+            ((1080, 1920), (1080, 1920)),
+            ((1440, 2560), (1080, 1920)),
+            ((640, 360), (640, 360)),
+            ((1080, 1080), (1080, 1080)),
+        ] {
+            let source = sized_clip(dir.path(), w, h);
+            let proxy = probe(&proxy_of(dir.path(), &source)).unwrap();
+            assert_eq!((proxy.width, proxy.height), expected, "{w}x{h}");
+            assert!(proxy.width.is_multiple_of(2) && proxy.height.is_multiple_of(2));
+        }
+    }
+    #[test]
+    fn preview_proxy_keeps_timestamps_and_has_no_b_frames() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = sized_clip(dir.path(), 3840, 2160);
+        let proxy = proxy_of(dir.path(), &source);
+        let times = |p: &Path| stream_field(p, "frame=pts_time");
+        assert_eq!(times(&source), times(&proxy));
+        assert_eq!(stream_field(&proxy, "stream=has_b_frames"), "0");
     }
     #[test]
     fn preview_proxy_rejects_unusable_input() {

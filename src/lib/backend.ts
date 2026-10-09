@@ -5,13 +5,15 @@ import type {
   LaunchOptions,
   VideoMetadata,
 } from "./types";
+/** Webview URL for a thumbnail file written by the backend. */
+export const thumbnailSrc = (path: string) => convertFileSrc(path);
 export const backend = {
   launchOptions: () => invoke<LaunchOptions>("take_launch_options"),
   loadInput: async (path: string, loadId: number) => {
     const m = await invoke<VideoMetadata>("load_input", { path, loadId });
     return {
       ...m,
-      thumbnails: m.thumbnails.map((path) => convertFileSrc(path)),
+      thumbnails: m.thumbnails.map(thumbnailSrc),
     };
   },
   playbackAcceleration: () =>

@@ -22,6 +22,8 @@ const h = vi.hoisted(() => ({
   events: {} as Record<string, (event: { payload: unknown }) => void>,
 }));
 vi.mock("@/lib/backend", () => ({
+  thumbnailSrc: (path: string) =>
+    `asset://localhost/${encodeURIComponent(path)}`,
   backend: {
     launchOptions: h.launch,
     loadInput: h.load,
@@ -219,7 +221,6 @@ describe("video loading shell", () => {
       ["Reading container", "active"],
       ["Indexing keyframes", "pending"],
       ["Building preview", "pending"],
-      ["Building thumbnails", "pending"],
     ]);
     act(() =>
       h.events["inspect-progress"]({
@@ -230,7 +231,6 @@ describe("video loading shell", () => {
       ["Reading container", "done"],
       ["Indexing keyframes", "active"],
       ["Building preview", "pending"],
-      ["Building thumbnails", "pending"],
     ]);
     expect(
       screen.getByRole("progressbar", { name: "Inspecting video" }),
@@ -271,7 +271,7 @@ describe("video loading shell", () => {
     thumb(first, 1);
     act(() =>
       h.events["inspect-progress"]({
-        payload: { loadId: first, step: "Building thumbnails", fraction: 0.9 },
+        payload: { loadId: first, step: "Building preview", fraction: 0.9 },
       }),
     );
     const current = screen.getByTestId("timeline-placeholder");
@@ -290,6 +290,93 @@ describe("video loading shell", () => {
     expect(imgs[0].getAttribute("src")).toContain(
       encodeURIComponent(`/cache/${second}-0.jpg`),
     );
+  });
+  it("keeps filling the strip after ready and applies the done event", async () => {
+    let resolve!: (v: VideoMetadata) => void;
+    h.load.mockReturnValueOnce(new Promise((r) => (resolve = r)));
+    h.open.mockResolvedValueOnce("/videos/one.mp4");
+    render(<VideoTrimmer />);
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Choose video…" }),
+    );
+    const loadId = h.load.mock.calls[0][1] as number;
+    const thumb = (id: number, index: number) =>
+      act(() =>
+        h.events["inspect-thumbnail"]({
+          payload: {
+            loadId: id,
+            index,
+            count: 3,
+            path: `/c/${id}-${index}.jpg`,
+          },
+        }),
+      );
+    thumb(loadId, 0);
+    await act(async () => resolve({ ...metadata(), thumbnails: [] }));
+    await screen.findByRole("slider", { name: "Trim start" });
+    const strip = () => screen.getByTestId("timeline-selection").parentElement!;
+    expect(strip().querySelectorAll("img")).toHaveLength(1);
+    expect(
+      within(strip()).getAllByTestId("thumbnail-placeholder"),
+    ).toHaveLength(2);
+    thumb(loadId, 2);
+    thumb(loadId + 99, 1);
+    expect(strip().querySelectorAll("img")).toHaveLength(2);
+    act(() =>
+      h.events["inspect-thumbnails-done"]({
+        payload: { loadId: loadId + 99, thumbnails: [], warning: "stale" },
+      }),
+    );
+    expect(screen.queryByText("stale")).toBeNull();
+    act(() =>
+      h.events["inspect-thumbnails-done"]({
+        payload: {
+          loadId,
+          thumbnails: ["/c/a.jpg", "/c/b.jpg", "/c/c.jpg"],
+          warning: null,
+        },
+      }),
+    );
+    expect(strip().querySelectorAll("img")).toHaveLength(3);
+    act(() =>
+      h.events["inspect-thumbnails-done"]({
+        payload: { loadId, thumbnails: [], warning: "Thumbnails failed" },
+      }),
+    );
+    expect(screen.getByText("Thumbnails failed")).toBeVisible();
+    expect(strip().querySelectorAll("img")).toHaveLength(0);
+    expect(screen.getByRole("slider", { name: "Trim start" })).toBeVisible();
+  });
+  it("remounts the video and drops queued seeks when the preview URL changes", async () => {
+    const first = await ready({
+      ...metadata(),
+      previewUrl: "http://127.0.0.1:9/media?load=1",
+    });
+    const times: number[] = [];
+    let current = 0;
+    Object.defineProperty(first, "readyState", { value: 4 });
+    Object.defineProperty(first, "currentTime", {
+      get: () => current,
+      set: (v: number) => {
+        current = v;
+        times.push(v);
+      },
+    });
+    await userEvent.click(screen.getByRole("button", { name: /next frame/i }));
+    await userEvent.click(screen.getByRole("button", { name: /next frame/i }));
+    expect(times).toHaveLength(1);
+    h.open.mockResolvedValueOnce("/clips/two.mp4");
+    h.load.mockResolvedValueOnce({
+      ...metadata("/clips/two.mp4"),
+      previewUrl: "http://127.0.0.1:9/media?load=2",
+    });
+    await userEvent.click(screen.getByRole("button", { name: /replace/i }));
+    await screen.findByRole("heading", { name: "two.mp4" });
+    const second = document.querySelector("video")!;
+    expect(second).not.toBe(first);
+    expect(second.getAttribute("src")).toBe("http://127.0.0.1:9/media?load=2");
+    fireEvent.seeked(first);
+    expect(times).toHaveLength(1);
   });
   it("shows metadata tags in the loaded header", async () => {
     await ready({

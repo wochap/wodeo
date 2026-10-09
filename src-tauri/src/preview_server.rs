@@ -30,7 +30,7 @@ impl MediaResolver for StateResolver {
             .and_then(|guard| {
                 guard
                     .as_ref()
-                    .and_then(|media| media.thumbnails.get(index).cloned())
+                    .and_then(|media| media.thumbnails.lock().ok()?.get(index).cloned().flatten())
             })
     }
 }
@@ -195,10 +195,11 @@ async fn respond(
     resolver: &dyn MediaResolver,
     head: &RequestHead,
 ) -> std::io::Result<()> {
-    let path = if head.target == "/media" {
+    // Each load gets its own `?load=<id>` URL; the query only busts caches.
+    let target = head.target.split('?').next().unwrap_or_default();
+    let path = if target == "/media" {
         resolver.media()
-    } else if let Some(index) = head
-        .target
+    } else if let Some(index) = target
         .strip_prefix("/thumb/")
         .and_then(|v| v.parse::<usize>().ok())
     {
@@ -498,6 +499,27 @@ mod tests {
         assert_eq!(body, b"jpegbytes");
         let (status, _, _) = raw_request(addr, "GET /thumb/1 HTTP/1.1\r\n\r\n").await;
         assert_eq!(status, 404);
+    }
+    #[tokio::test]
+    async fn routing_ignores_the_load_query() {
+        let dir = tempfile::tempdir().unwrap();
+        let thumb = dir.path().join("frame-00.jpg");
+        std::fs::write(&thumb, b"jpegbytes").unwrap();
+        let addr = start_server(Some(write_media(dir.path())), vec![thumb]).await;
+        let (status, head, body) = raw_request(
+            addr,
+            "GET /media?load=7 HTTP/1.1\r\nRange: bytes=2-4\r\n\r\n",
+        )
+        .await;
+        assert_eq!(status, 206);
+        assert!(head.contains("Content-Range: bytes 2-4/16"));
+        assert_eq!(body, b"234");
+        let (status, _, body) = raw_request(addr, "GET /thumb/0?load=7 HTTP/1.1\r\n\r\n").await;
+        assert_eq!(status, 200);
+        assert_eq!(body, b"jpegbytes");
+        let (status, _, body) = raw_request(addr, "GET /other?load=7 HTTP/1.1\r\n\r\n").await;
+        assert_eq!(status, 404);
+        assert!(body.is_empty() || !body.starts_with(b"0123"));
     }
     #[tokio::test]
     async fn head_requests_send_headers_without_body() {

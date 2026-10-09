@@ -6,7 +6,7 @@ type Props = {
   end: number;
   playhead: number;
   step: number;
-  thumbnails: string[];
+  thumbnails: (string | null)[];
   onSeek: (v: number) => void;
   onRange: (s: number, e: number, boundary: "start" | "end") => void;
 };
@@ -176,14 +176,22 @@ export function Timeline({
       >
         <div className="pointer-events-none absolute inset-0 flex gap-0.5 overflow-hidden rounded-md">
           {thumbnails.length ? (
-            thumbnails.map((t, i) => (
-              <img
-                key={i}
-                src={t}
-                alt=""
-                className="h-full min-w-0 flex-1 object-cover"
-              />
-            ))
+            thumbnails.map((t, i) =>
+              t ? (
+                <img
+                  key={i}
+                  src={t}
+                  alt=""
+                  className="h-full min-w-0 flex-1 object-cover"
+                />
+              ) : (
+                <div
+                  key={i}
+                  data-testid="thumbnail-placeholder"
+                  className="flex-1 bg-neutral-800"
+                />
+              ),
+            )
           ) : (
             <div className="flex-1 bg-linear-to-r from-neutral-800 to-neutral-700" />
           )}

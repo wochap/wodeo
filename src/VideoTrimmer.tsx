@@ -99,9 +99,9 @@ export default function VideoTrimmer() {
       >
         <div className="flex items-center gap-2.5 text-xs text-neutral-400">
           <span>Timeline</span>
-          {video && !inspecting && video.thumbnailWarning && (
+          {video && !inspecting && t.inspection.thumbnailWarning && (
             <span className="truncate text-neutral-500">
-              {video.thumbnailWarning}
+              {t.inspection.thumbnailWarning}
             </span>
           )}
         </div>
@@ -112,7 +112,7 @@ export default function VideoTrimmer() {
             end={t.end}
             playhead={t.playhead}
             step={t.step}
-            thumbnails={video.thumbnails}
+            thumbnails={t.inspection.thumbnails}
             onSeek={t.seek}
             onRange={t.range}
           />
