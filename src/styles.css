@@ -287,3 +287,212 @@
     transform: translateX(265%);
   }
 }
+/* — keyboard shortcuts — */
+/* One system: .kbd caps everywhere, a .keybar always-on layer in the
+   transport (degrades by its own width via container queries; the "?"
+   entry never drops), and a .keyref full reference opened by "?". */
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  flex: none;
+  font: 500 10.5px/1 var(--font-mono);
+  color: var(--color-neutral-300);
+  border: 1px solid var(--color-divider);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+.keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.keyhint {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  font-size: 11.5px;
+  color: var(--color-neutral-400);
+}
+.keybar {
+  container: keybar / inline-size;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+}
+.keybar-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.keybar-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: 11.5px;
+  color: var(--color-text);
+  padding-right: 12px;
+  border-right: 1px solid var(--color-divider);
+}
+.keybar-mode::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--color-accent);
+  box-shadow: 0 0 8px var(--color-accent);
+}
+.btn.keybar-more {
+  gap: 6px;
+  padding: 3px 8px 3px 4px;
+  font-size: 12px;
+  flex: none;
+  color: var(--color-neutral-400);
+}
+.btn.keybar-more:hover {
+  color: var(--color-text);
+}
+.btn.keybar-more[aria-expanded="true"] {
+  color: var(--color-text);
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+}
+@container keybar (max-width: 440px) {
+  .keybar-row[data-mode="handle"] .keyhint[data-p="3"] {
+    display: none;
+  }
+}
+@container keybar (max-width: 360px) {
+  .keyhint-label {
+    display: none;
+  }
+  .keybar-mode {
+    padding-right: 0;
+    border: 0;
+  }
+  .keybar-row {
+    gap: 8px;
+  }
+}
+@container keybar (max-width: 236px) {
+  .keyhint[data-p="3"],
+  .keybar-more-label {
+    display: none;
+  }
+  .btn.keybar-more {
+    padding: 3px 4px;
+  }
+}
+@container keybar (max-width: 132px) {
+  .keyhint,
+  .keybar-mode {
+    display: none;
+  }
+}
+.keyhint-tip {
+  position: absolute;
+  top: calc(100% + 6px);
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  font-size: 11.5px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.keyref {
+  width: min(620px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 24px 24px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+}
+.keyref-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.keyref-heading {
+  font-weight: 500;
+  font-size: 15px;
+  color: var(--color-text);
+}
+.keyref-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px 32px;
+}
+.keyref-col {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.keyref-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.keyref-title {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-neutral-400);
+}
+.keyref-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--color-neutral-400);
+  margin-bottom: 2px;
+}
+.keyref-row {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 26px;
+  font-size: 12.5px;
+  color: var(--color-text);
+}
+.keyref-act {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.keyref-scope {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--color-neutral-400);
+}
+.keyref-scope::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1px solid var(--color-neutral-400);
+}
+.keyref-scope[data-scope="handle"]::before {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}

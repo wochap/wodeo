@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { EmptyState, Inspecting, VideoStage } from "@/components/Stage";
 import { ThumbnailStrip, Timeline } from "@/components/Timeline";
 import { Transport } from "@/components/Transport";
+import { ShortcutReference } from "@/components/ShortcutReference";
 import { useTrimmer } from "@/useTrimmer";
 import { cn } from "@/lib/utils";
 export default function VideoTrimmer() {
@@ -32,7 +33,7 @@ export default function VideoTrimmer() {
         onToggleSidebar={() => setSidebarOpen((v) => !v)}
       />
       <div className="relative grid min-h-0 min-[960px]:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="flex min-h-0 min-w-0 flex-col">
+        <div className="relative flex min-h-0 min-w-0 flex-col">
           {inspecting ? (
             <Inspecting
               step={t.inspection.step}
@@ -54,6 +55,7 @@ export default function VideoTrimmer() {
           ) : (
             <EmptyState onOpen={() => void t.pick()} />
           )}
+          {t.referenceOpen && <ShortcutReference />}
           <Transport
             enabled={transportEnabled}
             playing={t.playing}
@@ -67,6 +69,10 @@ export default function VideoTrimmer() {
             onNextFrame={() => t.seek(t.playhead + t.step)}
             onGoToOut={() => t.seek(t.end)}
             onPlaySelection={() => t.playInterval(t.start, t.end)}
+            focusedHandle={t.focusedHandle}
+            referenceOpen={t.referenceOpen}
+            onToggleReference={t.toggleReference}
+            moreButton={t.moreButton}
           />
         </div>
         <Sidebar
@@ -116,6 +122,7 @@ export default function VideoTrimmer() {
             thumbnails={t.inspection.thumbnails}
             onSeek={t.seek}
             onRange={t.range}
+            onHandleFocus={t.setFocusedHandle}
           />
         ) : (
           <>

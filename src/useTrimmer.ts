@@ -86,7 +86,9 @@ export function useTrimmer() {
       verbose: false,
       inputExtensions: [],
     }),
-    [acceleration, setAcceleration] = useState<AccelerationRecord[]>([]);
+    [acceleration, setAcceleration] = useState<AccelerationRecord[]>([]),
+    [focusedHandle, setFocusedHandle] = useState<"start" | "end" | null>(null),
+    [referenceOpen, setReferenceOpen] = useState(false);
   const player = useRef<HTMLVideoElement>(null),
     cancelRequested = useRef(false),
     launchRequested = useRef(false),
@@ -107,7 +109,10 @@ export function useTrimmer() {
     // At most one media seek runs at a time; the newest request waits in
     // `pendingSeek` and is applied on `seeked`.
     seekInFlight = useRef(false),
-    pendingSeek = useRef<number | null>(null);
+    pendingSeek = useRef<number | null>(null),
+    moreButton = useRef<HTMLButtonElement>(null),
+    // Focus to restore when the shortcut reference closes.
+    referenceReturn = useRef<Element | null>(null);
   inspectionRef.current = inspection;
   const step = frameStepMicros(video?.frameRate ?? 30);
   const outputPath =
@@ -372,6 +377,7 @@ export function useTrimmer() {
     boundedSeekTarget.current = null;
     boundedVersion.current += 1;
     player.current?.pause();
+    setReferenceOpen(false);
     setPhase("exporting");
     setProgress(null);
     setError("");
@@ -413,6 +419,25 @@ export function useTrimmer() {
     quality,
     outputPath,
   ]);
+  const closeReference = () => {
+    setReferenceOpen(false);
+    const back = referenceReturn.current;
+    referenceReturn.current = null;
+    const target =
+      back instanceof HTMLElement && back.isConnected && back !== document.body
+        ? back
+        : moreButton.current;
+    target?.focus();
+  };
+  const toggleReference = () => {
+    if (referenceOpen) {
+      setReferenceOpen(false);
+      referenceReturn.current = null;
+    } else {
+      referenceReturn.current = document.activeElement;
+      setReferenceOpen(true);
+    }
+  };
   const cancel = () =>
     phase === "exporting" ? setConfirm(true) : void backend.exit(130);
   useEffect(() => {
@@ -424,6 +449,18 @@ export function useTrimmer() {
           t.getAttribute("role") === "dialog")
       )
         return;
+      if (referenceOpen && e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        closeReference();
+        return;
+      }
+      if (e.key === "?" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (phase === "exporting") return;
+        e.preventDefault();
+        toggleReference();
+        return;
+      }
       if (e.ctrlKey && e.key.toLowerCase() === "o") {
         e.preventDefault();
         void pick();
@@ -468,7 +505,7 @@ export function useTrimmer() {
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [phase, pick, playhead, step, start, end, trim, video]);
+  }, [phase, pick, playhead, step, start, end, trim, video, referenceOpen]);
   const clearBounded = () => {
     boundedStop.current = null;
     boundedSeekTarget.current = null;
@@ -567,5 +604,10 @@ export function useTrimmer() {
     trim,
     cancel,
     confirmCancel,
+    focusedHandle,
+    setFocusedHandle,
+    referenceOpen,
+    toggleReference,
+    moreButton,
   };
 }

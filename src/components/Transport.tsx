@@ -11,15 +11,7 @@ import { formatMicros } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
-import { Kbd } from "@/components/ui/kbd";
-// Secondary hints drop out first so the bar fits at the 1280px design width.
-const HINTS: [string[], string, string?][] = [
-  [["Space"], "Play"],
-  [["←", "→"], "Frame"],
-  [["Shift"], "1 s", "max-[1320px]:hidden"],
-  [["I", "O"], "Set in / out"],
-  [["Enter"], "Trim", "max-[1320px]:hidden"],
-];
+import { KeyBar } from "@/components/KeyBar";
 export function Transport({
   enabled,
   playing,
@@ -31,6 +23,10 @@ export function Transport({
   onNextFrame,
   onGoToOut,
   onPlaySelection,
+  focusedHandle,
+  referenceOpen,
+  onToggleReference,
+  moreButton,
 }: {
   enabled: boolean;
   playing: boolean;
@@ -43,6 +39,10 @@ export function Transport({
   onNextFrame: () => void;
   onGoToOut: () => void;
   onPlaySelection: () => void;
+  focusedHandle: "start" | "end" | null;
+  referenceOpen: boolean;
+  onToggleReference: () => void;
+  moreButton: React.Ref<HTMLButtonElement>;
 }) {
   const icon = (
     label: string,
@@ -104,19 +104,12 @@ export function Transport({
           </span>
         )}
       </div>
-      <ul
-        aria-label="Keyboard shortcuts"
-        className="ml-auto flex items-center gap-3.5 overflow-hidden text-[11.5px] whitespace-nowrap text-neutral-500 max-[1100px]:hidden"
-      >
-        {HINTS.map(([keys, action, hide]) => (
-          <li key={action} className={cn("flex items-center gap-[5px]", hide)}>
-            {keys.map((k) => (
-              <Kbd key={k}>{k}</Kbd>
-            ))}
-            {action}
-          </li>
-        ))}
-      </ul>
+      <KeyBar
+        ref={moreButton}
+        focusedHandle={focusedHandle}
+        referenceOpen={referenceOpen}
+        onToggleReference={onToggleReference}
+      />
     </div>
   );
 }

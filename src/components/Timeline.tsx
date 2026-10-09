@@ -1,6 +1,7 @@
-import { useRef, type KeyboardEvent, type PointerEvent } from "react";
+import { useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { isAltArrow, navigationTarget } from "@/lib/navigation";
 import { formatMicros } from "@/lib/time";
+import { Kbd } from "@/components/ui/kbd";
 type Props = {
   duration: number;
   start: number;
@@ -11,6 +12,7 @@ type Props = {
   thumbnails: (string | null)[];
   onSeek: (v: number) => void;
   onRange: (s: number, e: number, boundary: "start" | "end") => void;
+  onHandleFocus?: (which: "start" | "end" | null) => void;
 };
 // [major, minor] tick spacing in seconds; the first with at most ten majors wins.
 const TICK_STEPS: [number, number][] = [
@@ -101,8 +103,32 @@ export function Timeline({
   thumbnails,
   onSeek,
   onRange,
+  onHandleFocus,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  // The tip shows only for keyboard focus, not after a pointer press.
+  const [tip, setTip] = useState<"start" | "end" | null>(null);
+  const pointerFocus = useRef(false);
+  const focusVisible = (el: Element) => {
+    try {
+      return el.matches(":focus-visible");
+    } catch {
+      return true;
+    }
+  };
+  const focusEvents = (which: "start" | "end") => ({
+    onFocus: (e: { currentTarget: Element }) => {
+      onHandleFocus?.(which);
+      setTip(
+        !pointerFocus.current && focusVisible(e.currentTarget) ? which : null,
+      );
+      pointerFocus.current = false;
+    },
+    onBlur: () => {
+      onHandleFocus?.(null);
+      setTip(null);
+    },
+  });
   const isScrubbing = useRef(false);
   const pct = (v: number) => `${duration ? (100 * v) / duration : 0}%`;
   const at = (e: PointerEvent) => {
@@ -241,12 +267,17 @@ export function Timeline({
           aria-valuetext={formatMicros(start)}
           className={handle}
           style={{ left: pct(start) }}
+          {...focusEvents("start")}
           onPointerDown={(e) => {
             e.stopPropagation();
+            pointerFocus.current = document.activeElement !== e.currentTarget;
             drag("start", e);
           }}
           onPointerMove={(e) => e.buttons && drag("start", e)}
-          onKeyDown={(e) => key("start", e)}
+          onKeyDown={(e) => {
+            setTip("start");
+            key("start", e);
+          }}
         >
           {grip}
         </div>
@@ -260,15 +291,41 @@ export function Timeline({
           aria-valuetext={formatMicros(end)}
           className={`${handle} -translate-x-full`}
           style={{ left: pct(end) }}
+          {...focusEvents("end")}
           onPointerDown={(e) => {
             e.stopPropagation();
+            pointerFocus.current = document.activeElement !== e.currentTarget;
             drag("end", e);
           }}
           onPointerMove={(e) => e.buttons && drag("end", e)}
-          onKeyDown={(e) => key("end", e)}
+          onKeyDown={(e) => {
+            setTip("end");
+            key("end", e);
+          }}
         >
           {grip}
         </div>
+        {tip && (
+          <div
+            data-testid="handle-tip"
+            className="keyhint-tip -translate-x-1/2"
+            style={{ left: pct(tip === "start" ? start : end) }}
+          >
+            <span className="font-mono text-text tabular-nums">
+              <span className="text-accent">
+                {tip === "start" ? "IN" : "OUT"}
+              </span>{" "}
+              {formatMicros(tip === "start" ? start : end)}
+            </span>
+            <span className="keyhint">
+              <span className="keys">
+                <Kbd>Home</Kbd>
+                <Kbd>End</Kbd>
+              </span>
+              <span>Limits</span>
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

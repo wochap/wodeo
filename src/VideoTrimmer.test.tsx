@@ -8,6 +8,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { SHORTCUTS } from "@/lib/shortcuts";
 import type { ExportProgress, LaunchOptions, VideoMetadata } from "@/lib/types";
 type DragDropEvent = { payload: { type: string; paths: string[] } };
 const h = vi.hoisted(() => ({
@@ -720,11 +721,126 @@ describe("transport", () => {
     for (const name of names)
       expect(screen.getByRole("button", { name, hidden: true })).toBeDisabled();
   });
-  it("lists the keyboard shortcuts", async () => {
+  it("shows the key bar instead of hint chips", async () => {
     await ready();
-    const hints = screen.getByRole("list", { name: "Keyboard shortcuts" });
-    for (const key of ["Space", "←", "→", "Shift", "I", "O", "Enter"])
+    const hints = screen.getByRole("list", { name: "Key hints" });
+    for (const key of ["Space", "←", "→", "I", "O"])
       expect(within(hints).getByText(key)).toBeInTheDocument();
+    for (const label of ["Play", "Frame", "In / out"])
+      expect(within(hints).getByText(label)).toBeInTheDocument();
+    expect(within(hints).queryByText("Shift")).toBeNull();
+    expect(within(hints).queryByText("Enter")).toBeNull();
+    expect(within(hints).queryByText("1 s")).toBeNull();
+    expect(screen.getByRole("button", { name: "All keys" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+  });
+  it("switches the key bar to handle mode while a handle is focused", async () => {
+    await ready();
+    const hints = () => screen.getByRole("list", { name: "Key hints" });
+    for (const [name, label, tip] of [
+      ["Trim start", "In handle", "IN"],
+      ["Trim end", "Out handle", "OUT"],
+    ]) {
+      const handle = screen.getByRole("slider", { name });
+      act(() => handle.focus());
+      expect(screen.getByText(label)).toBeInTheDocument();
+      for (const text of ["Frame", "±1 s", "Keyframe", "Shift", "Alt"])
+        expect(within(hints()).getByText(text)).toBeInTheDocument();
+      // jsdom has no :focus-visible; a keystroke marks keyboard focus.
+      fireEvent.keyDown(handle, { key: "Shift" });
+      const shown = screen.getByTestId("handle-tip");
+      expect(shown).toHaveTextContent(tip);
+      expect(shown).toHaveTextContent(handle.getAttribute("aria-valuetext")!);
+      expect(within(shown).getByText("Home")).toBeInTheDocument();
+      act(() => handle.blur());
+      expect(screen.queryByText(label)).toBeNull();
+      expect(screen.queryByTestId("handle-tip")).toBeNull();
+      expect(within(hints()).getByText("Space")).toBeInTheDocument();
+    }
+  });
+  it("toggles the shortcut reference with ? and the All keys button", async () => {
+    await ready();
+    const button = screen.getByRole("button", { name: "All keys" });
+    fireEvent.keyDown(window, { key: "?" });
+    expect(
+      screen.getByRole("dialog", { name: "Keyboard shortcuts" }),
+    ).toBeInTheDocument();
+    expect(button).toHaveAttribute("aria-expanded", "true");
+    fireEvent.keyDown(window, { key: "?" });
+    expect(
+      screen.queryByRole("dialog", { name: "Keyboard shortcuts" }),
+    ).toBeNull();
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(button);
+    expect(button).toHaveAttribute("aria-expanded", "true");
+    await userEvent.click(button);
+    expect(button).toHaveAttribute("aria-expanded", "false");
+  });
+  it("does not open the reference when ? is typed in a text field", async () => {
+    await ready();
+    const input = field("File name");
+    await userEvent.type(input, "?");
+    expect(input.value).toContain("?");
+    expect(
+      screen.queryByRole("dialog", { name: "Keyboard shortcuts" }),
+    ).toBeNull();
+  });
+  it("closes the reference with Escape without cancelling", async () => {
+    await ready();
+    const handle = screen.getByRole("slider", { name: "Trim start" });
+    act(() => handle.focus());
+    fireEvent.keyDown(handle, { key: "?" });
+    expect(
+      screen.getByRole("dialog", { name: "Keyboard shortcuts" }),
+    ).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(
+      screen.queryByRole("dialog", { name: "Keyboard shortcuts" }),
+    ).toBeNull();
+    expect(h.exit).not.toHaveBeenCalled();
+    expect(handle).toHaveFocus();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(h.exit).toHaveBeenCalledWith(130);
+  });
+  it("lists every shortcut in the reference and no retired binding", async () => {
+    await ready();
+    fireEvent.keyDown(window, { key: "?" });
+    const ref = screen.getByRole("dialog", { name: "Keyboard shortcuts" });
+    for (const s of SHORTCUTS) {
+      expect(within(ref).getByText(s.title)).toBeInTheDocument();
+      for (const k of s.keys)
+        expect(within(ref).getAllByText(k).length).toBeGreaterThan(0);
+    }
+    for (const group of ["Playback", "Navigate", "Trim", "Actions"])
+      expect(
+        within(ref).getByRole("region", { name: group }),
+      ).toBeInTheDocument();
+    expect(within(ref).getByText("Focused handle only")).toHaveAttribute(
+      "data-scope",
+      "handle",
+    );
+    const caps = [...document.querySelectorAll("kbd")].map(
+      (k) => k.textContent,
+    );
+    for (const retired of [",", ".", "[", "]", "⌘↵"])
+      expect(caps).not.toContain(retired);
+    for (const k of document.querySelectorAll("kbd"))
+      expect(k).toHaveClass("kbd");
+  });
+  it("shows Esc and Enter caps on the sidebar actions", async () => {
+    await ready();
+    const sidebar = screen.getByRole("complementary", {
+      name: "Trim settings",
+    });
+    expect(
+      within(within(sidebar).getByRole("button", { name: "Cancel" })).getByText(
+        "Esc",
+      ),
+    ).toHaveClass("kbd");
+    expect(within(trimButton()).getByText("Enter")).toHaveClass("kbd");
+    expect(sidebar.querySelectorAll("kbd")).toHaveLength(2);
   });
   it("supports keyboard seeking, range changes, opening, and immediate cancellation", async () => {
     const video = await ready();

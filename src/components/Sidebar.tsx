@@ -6,6 +6,7 @@ import { formatMicros, parseTimecode } from "@/lib/time";
 import type { ExportFormat, ExportQuality, VideoMetadata } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import { Field, Input } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
 const FORMATS: { value: ExportFormat; label: string }[] = [
@@ -273,16 +274,22 @@ export function Sidebar({
               : statusText({ video: ready ? video : null, format, start }))}
         </p>
         <div className="flex gap-2">
-          <Button className="flex-1" onClick={onCancel}>
-            Cancel
+          <Button
+            className="flex-1"
+            aria-keyshortcuts="Escape"
+            onClick={onCancel}
+          >
+            Cancel <Kbd aria-hidden="true">Esc</Kbd>
           </Button>
           <Button
             variant="primary"
             className="flex-2"
             disabled={!canTrim}
+            aria-keyshortcuts="Enter"
             onClick={onTrim}
           >
-            <Icon icon={Scissors} /> Trim &amp; save
+            <Icon icon={Scissors} /> Trim &amp; save{" "}
+            <Kbd aria-hidden="true">Enter</Kbd>
           </Button>
         </div>
       </div>
