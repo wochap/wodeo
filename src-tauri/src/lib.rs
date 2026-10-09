@@ -86,16 +86,21 @@ pub fn run() {
                     std::process::exit(lifecycle::EXIT_STARTUP)
                 });
             app.manage(server);
-            let handle = app.handle().clone();
-            std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_millis(1000));
-                if let Some(window) = handle.get_webview_window("main") {
-                    if !window.is_visible().unwrap_or(false) {
-                        tracing::info!("frontend did not show the window; showing it");
-                        let _ = window.show();
-                    }
+            // The window starts hidden (tauri.conf.json) so its background matches the
+            // system theme before the first frame; otherwise WebKit's stale-size first
+            // frame shows as a wrong-colour area before the tiled configure arrives.
+            if let Some(window) = app.get_webview_window("main") {
+                let background = match window.theme() {
+                    Ok(tauri::Theme::Light) => tauri::window::Color(0xef, 0xf1, 0xf5, 0xff),
+                    _ => tauri::window::Color(0x1e, 0x1e, 0x2e, 0xff),
+                };
+                if let Err(e) = window.set_background_color(Some(background)) {
+                    tracing::warn!("failed to set window background: {e}");
                 }
-            });
+                if let Err(e) = window.show() {
+                    tracing::warn!("failed to show window: {e}");
+                }
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
