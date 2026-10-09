@@ -165,3 +165,22 @@ The system SHALL deliver each generated thumbnail to the editor as soon as it is
 #### Scenario: Load replaced mid-inspection
 - **WHEN** the user opens another file before inspection completes
 - **THEN** thumbnails from the previous file are discarded and never appear in the new strip
+
+### Requirement: Preview revealed at first frame
+The system SHALL keep the preview video element in the layout but visually hidden from the moment it is mounted until its first frame is available (the media element's `loadeddata` event), so that no default-sized placeholder box or empty black frame is shown. The element MUST remain in the layout while hidden so that loading and decoding are not throttled. Revealing the video SHALL NOT change when playback and trim controls become enabled, which remains tied to the media's metadata being available.
+
+#### Scenario: Video loads normally
+- **WHEN** a probed video's preview URL is assigned to the video element
+- **THEN** the element stays invisible until its first frame is decoded, then appears at its final size showing that frame
+
+#### Scenario: No placeholder box
+- **WHEN** the video element is mounted before its metadata has loaded
+- **THEN** no black or empty rectangle is visible in the stage
+
+#### Scenario: Preview fails
+- **WHEN** the video element reports an error before its first frame is available
+- **THEN** the existing preview failure handling applies and no blank video box is left visible
+
+#### Scenario: Replace a loaded video
+- **WHEN** a different video replaces the loaded one
+- **THEN** the new video element is again hidden until its own first frame is available

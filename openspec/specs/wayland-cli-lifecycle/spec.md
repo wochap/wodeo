@@ -113,3 +113,26 @@ The system MUST reserve application stdout for canonical absolute destination pa
 #### Scenario: User cancellation
 - **WHEN** the user exits or confirms export cancellation before any successful completion
 - **THEN** stdout remains empty and the process exits with the documented cancellation status
+
+### Requirement: Window reveal without unstyled content
+The system SHALL create the main window hidden and SHALL show it only after the editor's first render has been committed, so that the first frame the compositor displays is the styled editor rather than a blank or white surface. The native window and the document SHALL both carry a background matching the active theme's base color (Catppuccin Mocha base `#1e1e2e` in dark mode, Latte base `#eff1f5` in light mode) before any application stylesheet loads. Readiness MUST NOT depend on `requestAnimationFrame` or any other callback that is suspended while the window is hidden. If the frontend has not shown the window within one second of application setup, the backend SHALL show it anyway.
+
+#### Scenario: Normal launch
+- **WHEN** the application starts and the editor completes its first render
+- **THEN** the frontend shows the main window and the first visible frame is the styled editor with no white flash
+
+#### Scenario: Frontend fails to signal readiness
+- **WHEN** the frontend does not show the window within one second of setup (for example, a script error before the first render)
+- **THEN** the backend shows the main window so the process is never left running with no visible window
+
+#### Scenario: Background before stylesheet
+- **WHEN** the window becomes visible before the application stylesheet has applied
+- **THEN** the visible background is the theme's base color, not white
+
+#### Scenario: Show permission
+- **WHEN** the frontend requests that the main window be shown
+- **THEN** the request is permitted by the main window's capability set
+
+#### Scenario: HiDPI first frame
+- **WHEN** the window is first shown on an output with a scale factor of 2
+- **THEN** the first visible frame is rendered at the output's scale, not at 1× and then corrected

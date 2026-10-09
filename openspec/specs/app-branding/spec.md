@@ -42,3 +42,14 @@ The Clip icon SHALL be resolvable from the user's icon theme by the name `wodeo`
 #### Scenario: Icons regenerated
 - **WHEN** a developer regenerates the icons from the SVG and runs the icon install script again
 - **THEN** the installed development icons are replaced with the new artwork
+
+### Requirement: Document identity
+The web document loaded into the main window SHALL be titled `wodeo` and SHALL NOT reference template assets from the project scaffold (such as the Vite favicon).
+
+#### Scenario: Document title
+- **WHEN** the main window's document loads
+- **THEN** its title is `wodeo`
+
+#### Scenario: No template favicon
+- **WHEN** the document head is inspected
+- **THEN** it contains no reference to `/vite.svg` or other scaffold template assets
