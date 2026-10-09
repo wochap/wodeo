@@ -4,6 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { backend, thumbnailSrc } from "@/lib/backend";
 import { defaultOutput, joinOutput, splitOutput } from "@/lib/output";
+import { isAltArrow, navigationTarget } from "@/lib/navigation";
 import {
   clampRange,
   frameStepMicros,
@@ -439,12 +440,25 @@ export function useTrimmer() {
         return;
       }
       if (phase !== "ready") return;
+      const target = navigationTarget(e, {
+        value: playhead,
+        duration: video?.durationMicros ?? 0,
+        step,
+        keyframes: video?.keyframesMicros ?? [],
+      });
+      if (target !== null || isAltArrow(e)) {
+        // A focused trim handle owns navigation keys; never move both.
+        if (
+          e.defaultPrevented ||
+          (t instanceof Element && t.closest('[role="slider"]'))
+        )
+          return;
+        e.preventDefault();
+        if (target !== null) seek(target);
+        return;
+      }
       let handled = true;
       if (e.key === " ") toggle();
-      else if (e.key === "ArrowLeft")
-        seek(playhead - (e.shiftKey ? 1_000_000 : step));
-      else if (e.key === "ArrowRight")
-        seek(playhead + (e.shiftKey ? 1_000_000 : step));
       else if (e.key.toLowerCase() === "i") range(playhead, end);
       else if (e.key.toLowerCase() === "o") range(start, playhead);
       else if (e.key === "Enter") void trim();

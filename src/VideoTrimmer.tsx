@@ -112,6 +112,7 @@ export default function VideoTrimmer() {
             end={t.end}
             playhead={t.playhead}
             step={t.step}
+            keyframes={video.keyframesMicros}
             thumbnails={t.inspection.thumbnails}
             onSeek={t.seek}
             onRange={t.range}

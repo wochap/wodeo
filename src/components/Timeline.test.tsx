@@ -10,6 +10,7 @@ describe("Timeline", () => {
         end={900_000}
         playhead={500_000}
         step={40_000}
+        keyframes={[]}
         thumbnails={[]}
         onSeek={() => {}}
         onRange={() => {}}
@@ -33,6 +34,7 @@ describe("Timeline", () => {
         end={900_000}
         playhead={500_000}
         step={40_000}
+        keyframes={[]}
         thumbnails={[]}
         onSeek={() => {}}
         onRange={range}
@@ -55,6 +57,7 @@ describe("complete timeline interaction", () => {
         end={900_000}
         playhead={500_000}
         step={40_000}
+        keyframes={[]}
         thumbnails={[]}
         onSeek={seek}
         onRange={range}
@@ -87,6 +90,7 @@ describe("complete timeline interaction", () => {
         end={900_000}
         playhead={500_000}
         step={40_000}
+        keyframes={[]}
         thumbnails={[]}
         onSeek={() => {}}
         onRange={range}
@@ -111,6 +115,7 @@ describe("complete timeline interaction", () => {
         end={900_000}
         playhead={500_000}
         step={40_000}
+        keyframes={[]}
         thumbnails={[]}
         onSeek={() => {}}
         onRange={range}
@@ -148,6 +153,7 @@ describe("track scrubbing", () => {
         end={900_000}
         playhead={500_000}
         step={40_000}
+        keyframes={[]}
         thumbnails={thumbnails}
         onSeek={seek}
         onRange={() => {}}
@@ -209,6 +215,7 @@ describe("adaptive ruler", () => {
         end={duration}
         playhead={0}
         step={40_000}
+        keyframes={[]}
         thumbnails={[]}
         onSeek={() => {}}
         onRange={() => {}}
@@ -250,5 +257,94 @@ describe("adaptive ruler", () => {
     expect(strip.querySelectorAll("img")).toHaveLength(5);
     expect(screen.getAllByTestId("thumbnail-placeholder")).toHaveLength(9);
     expect(cells.slice(0, 5).every((c) => c.tagName === "IMG")).toBe(true);
+  });
+});
+describe("boundary navigation keys", () => {
+  const setup = (keyframes: number[] = [], start = 100_000, end = 900_000) => {
+    const range = vi.fn();
+    render(
+      <Timeline
+        duration={1_000_000}
+        start={start}
+        end={end}
+        playhead={500_000}
+        step={40_000}
+        keyframes={keyframes}
+        thumbnails={[]}
+        onSeek={() => {}}
+        onRange={range}
+      />,
+    );
+    return {
+      range,
+      handle: (which: "start" | "end") =>
+        screen.getByRole("slider", {
+          name: which === "start" ? "Trim start" : "Trim end",
+        }),
+    };
+  };
+  it("moves the start handle with each key", () => {
+    const { range, handle } = setup([0, 50_000, 300_000], 200_000);
+    const cases: [object, number][] = [
+      [{ key: "ArrowLeft" }, 160_000],
+      [{ key: "ArrowRight", shiftKey: true }, 860_000],
+      [{ key: "ArrowLeft", shiftKey: true }, 0],
+      [{ key: "PageUp" }, 860_000],
+      [{ key: "PageDown" }, 0],
+      [{ key: "ArrowLeft", altKey: true }, 50_000],
+      [{ key: "ArrowRight", altKey: true }, 300_000],
+      [{ key: "3" }, 300_000],
+    ];
+    for (const [init, want] of cases) {
+      range.mockClear();
+      fireEvent.keyDown(handle("start"), init);
+      expect(range).toHaveBeenCalledWith(want, 900_000, "start");
+    }
+  });
+  it("moves the end handle with each key", () => {
+    const { range, handle } = setup([0, 700_000, 950_000], 100_000, 800_000);
+    const cases: [object, number][] = [
+      [{ key: "ArrowRight" }, 840_000],
+      [{ key: "ArrowRight", shiftKey: true }, 1_000_000],
+      [{ key: "PageDown" }, 140_000],
+      [{ key: "ArrowLeft", altKey: true }, 700_000],
+      [{ key: "ArrowRight", altKey: true }, 950_000],
+      [{ key: "5" }, 500_000],
+    ];
+    for (const [init, want] of cases) {
+      range.mockClear();
+      fireEvent.keyDown(handle("end"), init);
+      expect(range).toHaveBeenCalledWith(100_000, want, "end");
+    }
+  });
+  it("clamps digit jumps against the other handle", () => {
+    const { range, handle } = setup([], 100_000, 500_000);
+    fireEvent.keyDown(handle("start"), { key: "9" });
+    expect(range).toHaveBeenLastCalledWith(460_000, 500_000, "start");
+    fireEvent.keyDown(handle("end"), { key: "0" });
+    expect(range).toHaveBeenLastCalledWith(100_000, 140_000, "end");
+  });
+  it("ignores Alt+arrows without a keyframe but still prevents default", () => {
+    const { range, handle } = setup([]);
+    const ev = new KeyboardEvent("keydown", {
+      key: "ArrowLeft",
+      altKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    handle("start").dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(true);
+    expect(range).not.toHaveBeenCalled();
+  });
+  it("keeps Home and End", () => {
+    const { range, handle } = setup();
+    fireEvent.keyDown(handle("start"), { key: "Home" });
+    expect(range).toHaveBeenLastCalledWith(0, 900_000, "start");
+    fireEvent.keyDown(handle("start"), { key: "End" });
+    expect(range).toHaveBeenLastCalledWith(860_000, 900_000, "start");
+    fireEvent.keyDown(handle("end"), { key: "Home" });
+    expect(range).toHaveBeenLastCalledWith(100_000, 140_000, "end");
+    fireEvent.keyDown(handle("end"), { key: "End" });
+    expect(range).toHaveBeenLastCalledWith(100_000, 1_000_000, "end");
   });
 });

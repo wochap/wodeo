@@ -746,6 +746,44 @@ describe("transport", () => {
     fireEvent.keyDown(window, { key: "Escape" });
     expect(h.exit).toHaveBeenCalledWith(130);
   });
+  it("navigates the playhead with coarse keys", async () => {
+    const video = await ready();
+    video.currentTime = 0.5;
+    fireEvent.timeUpdate(video);
+    fireEvent.keyDown(window, { key: "PageUp" });
+    expect(video.currentTime).toBeCloseTo(2);
+    fireEvent.keyDown(window, { key: "PageDown" });
+    expect(video.currentTime).toBeCloseTo(0);
+    fireEvent.keyDown(window, { key: "5" });
+    expect(video.currentTime).toBeCloseTo(1);
+    video.currentTime = 0.5;
+    fireEvent.timeUpdate(video);
+    fireEvent.keyDown(window, { key: "ArrowRight", altKey: true });
+    expect(video.currentTime).toBeCloseTo(1);
+    fireEvent.keyDown(window, { key: "ArrowLeft", altKey: true });
+    expect(video.currentTime).toBeCloseTo(0);
+  });
+  it("ignores Alt+arrows with an empty keyframe index", async () => {
+    const video = await ready({ ...metadata(), keyframesMicros: [] });
+    video.currentTime = 0.5;
+    fireEvent.timeUpdate(video);
+    expect(fireEvent.keyDown(window, { key: "ArrowRight", altKey: true })).toBe(
+      false,
+    );
+    expect(video.currentTime).toBeCloseTo(0.5);
+  });
+  it("does not move the playhead when a focused handle takes an arrow", async () => {
+    const video = await ready();
+    video.currentTime = 1;
+    fireEvent.timeUpdate(video);
+    const handle = screen.getByRole("slider", { name: "Trim end" });
+    fireEvent.keyDown(handle, { key: "ArrowLeft" });
+    // Only the boundary moves (and the preview follows it), not playhead - step.
+    expect(handle).toHaveAttribute("aria-valuenow", "1960000");
+    expect(video.currentTime).toBeCloseTo(1.96);
+    fireEvent.keyDown(handle, { key: "ArrowRight", altKey: true });
+    expect(video.currentTime).toBeCloseTo(1.96);
+  });
   it("seeks to the active boundary for pointer and keyboard adjustments", async () => {
     const video = await ready();
     const startHandle = screen.getByRole("slider", { name: "Trim start" });

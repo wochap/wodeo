@@ -1,4 +1,5 @@
 import { useRef, type KeyboardEvent, type PointerEvent } from "react";
+import { isAltArrow, navigationTarget } from "@/lib/navigation";
 import { formatMicros } from "@/lib/time";
 type Props = {
   duration: number;
@@ -6,6 +7,7 @@ type Props = {
   end: number;
   playhead: number;
   step: number;
+  keyframes: number[];
   thumbnails: (string | null)[];
   onSeek: (v: number) => void;
   onRange: (s: number, e: number, boundary: "start" | "end") => void;
@@ -95,6 +97,7 @@ export function Timeline({
   end,
   playhead,
   step,
+  keyframes,
   thumbnails,
   onSeek,
   onRange,
@@ -120,12 +123,13 @@ export function Timeline({
       : onRange(start, Math.max(v, start + step), which);
   };
   const key = (which: "start" | "end", e: KeyboardEvent) => {
-    let v = which === "start" ? start : end;
-    if (e.key === "ArrowLeft") v -= step;
-    else if (e.key === "ArrowRight") v += step;
-    else if (e.key === "Home") v = which === "start" ? 0 : start + step;
+    const value = which === "start" ? start : end;
+    let v = navigationTarget(e, { value, duration, step, keyframes });
+    if (e.key === "Home") v = which === "start" ? 0 : start + step;
     else if (e.key === "End") v = which === "end" ? duration : end - step;
-    else return;
+    // Alt+arrow with no keyframe still must not navigate webview history.
+    if (v === null && isAltArrow(e)) e.preventDefault();
+    if (v === null) return;
     e.preventDefault();
     which === "start"
       ? onRange(Math.max(0, Math.min(v, end - step)), end, which)
