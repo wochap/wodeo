@@ -115,23 +115,27 @@ The system MUST reserve application stdout for canonical absolute destination pa
 - **THEN** stdout remains empty and the process exits with the documented cancellation status
 
 ### Requirement: Window reveal without unstyled content
-The system SHALL create the main window hidden and SHALL show it only after the editor's first render has been committed, so that the first frame the compositor displays is the styled editor rather than a blank or white surface. The native window and the document SHALL both carry a background matching the active theme's base color (Catppuccin Mocha base `#1e1e2e` in dark mode, Latte base `#eff1f5` in light mode) before any application stylesheet loads. Readiness MUST NOT depend on `requestAnimationFrame` or any other callback that is suspended while the window is hidden. If the frontend has not shown the window within one second of application setup, the backend SHALL show it anyway.
+The system SHALL create the main window hidden, SHALL set its native background to the active theme's base color (Catppuccin Mocha base `#1e1e2e` when the system color-scheme preference is dark or unknown, Latte base `#eff1f5` when it is light), and SHALL then show it from the backend during application setup, before the page has loaded. The document SHALL also carry a background matching the theme's base color before any application stylesheet loads. The frontend MUST NOT be responsible for showing the window, and showing it MUST NOT wait for the editor's first render, so that the compositor has assigned the window its final size before the editor first paints.
 
 #### Scenario: Normal launch
-- **WHEN** the application starts and the editor completes its first render
-- **THEN** the frontend shows the main window and the first visible frame is the styled editor with no white flash
+- **WHEN** the application starts
+- **THEN** the backend shows the main window during setup, and the first visible frames are the theme's base color followed by the styled editor at the window's final size, with no white flash
 
-#### Scenario: Frontend fails to signal readiness
-- **WHEN** the frontend does not show the window within one second of setup (for example, a script error before the first render)
-- **THEN** the backend shows the main window so the process is never left running with no visible window
+#### Scenario: Tiled window size differs from the configured size
+- **WHEN** the compositor gives the window a size different from its configured 1280×800 (for example, a tiled layout)
+- **THEN** no frame shows the editor laid out at the configured size and cut off or short inside the window
+
+#### Scenario: Light-mode launch
+- **WHEN** the application starts while the system color-scheme preference is light
+- **THEN** the native window background is Latte base `#eff1f5`, and no dark frame appears before the editor paints
 
 #### Scenario: Background before stylesheet
 - **WHEN** the window becomes visible before the application stylesheet has applied
 - **THEN** the visible background is the theme's base color, not white
 
-#### Scenario: Show permission
-- **WHEN** the frontend requests that the main window be shown
-- **THEN** the request is permitted by the main window's capability set
+#### Scenario: Frontend fails to load
+- **WHEN** a script error prevents the editor from rendering
+- **THEN** the main window is still visible, because the backend showed it during setup
 
 #### Scenario: HiDPI first frame
 - **WHEN** the window is first shown on an output with a scale factor of 2

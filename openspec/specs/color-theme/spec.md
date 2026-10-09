@@ -22,7 +22,7 @@ The editor SHALL take every color from the Catppuccin palette: Mocha in the dark
 - **THEN** shadow rings, shadow shade opacity, and the divider color change with it, with no fixed hex or black shadow color left from the other theme
 
 ### Requirement: Theme follows the system
-The editor SHALL choose the dark or light theme from the system color-scheme preference reported for the application window, and SHALL switch themes while running when that preference changes, without a restart. Until the window theme is known, the editor SHALL use the `prefers-color-scheme` media query. When neither source reports a preference, the editor SHALL use the dark theme.
+The editor SHALL choose the dark or light theme from the webview's `prefers-color-scheme` media query, which reflects the system color-scheme preference that the window toolkit copies from the desktop portal into the GTK dark preference, and SHALL switch themes while running when that preference changes, without a restart. The frontend MUST NOT pin the theme by setting `data-theme` from a value read at startup. `data-theme="light"` or `data-theme="dark"` on the document SHALL remain available only as a manual override. When no preference is reported, the editor SHALL use the dark theme.
 
 #### Scenario: System prefers light at launch
 - **WHEN** the application starts while the system color-scheme preference is light
@@ -33,8 +33,12 @@ The editor SHALL choose the dark or light theme from the system color-scheme pre
 - **THEN** the editor switches to the matching theme without reloading or losing the loaded video, selection, or playhead
 
 #### Scenario: No preference reported
-- **WHEN** neither the window theme nor `prefers-color-scheme` reports a preference
+- **WHEN** neither the portal nor `prefers-color-scheme` reports a light preference
 - **THEN** the editor renders in the Mocha theme
+
+#### Scenario: Startup theme does not pin the editor
+- **WHEN** the application started in one theme and the system preference later changes
+- **THEN** no `data-theme` attribute set by the application prevents the `prefers-color-scheme` rules from applying
 
 ### Requirement: Native controls match the theme
 The editor SHALL declare the active color scheme to the webview, so native scrollbars, form controls, and default canvas colors match the active theme.
