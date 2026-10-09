@@ -19,12 +19,37 @@ pub struct AccelerationRecord {
     pub device: Option<String>,
     pub reason: Option<String>,
 }
+const HW_CODECS: &[&str] = &["h264", "h265", "av1", "vp9", "vp8", "mpeg2", "jpeg"];
+fn is_hw_codec(s: &str) -> bool {
+    HW_CODECS.contains(&s)
+}
+/// Hardware API of a VA-API (`va[renderD<N>]<codec>dec`, `vaapi<codec>dec`)
+/// or NVDEC (`nv<codec>[sl]dec`) decoder factory.
+fn hardware_api(name: &str) -> Option<&'static str> {
+    let core = name.strip_suffix("dec")?;
+    if let Some(codec) = core.strip_prefix("vaapi") {
+        return is_hw_codec(codec).then_some("VA-API");
+    }
+    if let Some(rest) = core.strip_prefix("va") {
+        let codec = match rest.strip_prefix("renderD") {
+            Some(r) => {
+                let digits = r.bytes().take_while(u8::is_ascii_digit).count();
+                if digits == 0 {
+                    return None;
+                }
+                &r[digits..]
+            }
+            None => rest,
+        };
+        return is_hw_codec(codec).then_some("VA-API");
+    }
+    let codec = core.strip_prefix("nv")?;
+    let codec = codec.strip_suffix("sl").unwrap_or(codec);
+    is_hw_codec(codec).then_some("NVDEC")
+}
 pub fn classify_decoder(name: &str) -> AccelerationState {
     let n = name.to_ascii_lowercase();
-    if ["vah264dec", "vaapih264dec", "vavp9dec", "vaav1dec"]
-        .iter()
-        .any(|x| n.contains(x))
-    {
+    if hardware_api(&n).is_some() || hardware_api(name).is_some() {
         AccelerationState::Active
     } else if n.starts_with("avdec_") || n.contains("openh264dec") {
         AccelerationState::Software
@@ -61,7 +86,7 @@ pub fn unknown_playback() -> Vec<AccelerationRecord> {
             implementation: None,
             api: None,
             device: None,
-            reason: Some("DMA-BUF rendering has not been observed".into()),
+            reason: Some("Rendering path has not been observed".into()),
         },
     ]
 }
@@ -81,6 +106,7 @@ const VIDEO_CODECS: &[&str] = &[
 // decoders such as avdec_aac created after the video decoder are ignored.
 fn is_video_decoder(name: &str) -> bool {
     FACTORIES.contains(&name)
+        || hardware_api(name).is_some()
         || ((name.ends_with("dec") || name.starts_with("avdec_"))
             && VIDEO_CODECS.iter().any(|c| name.contains(c)))
 }
@@ -110,11 +136,7 @@ pub fn playback_from_diagnostics(text: &str) -> Vec<AccelerationRecord> {
             let state = classify_decoder(name);
             AccelerationRecord {
                 component: "playback_decode".into(),
-                api: if state == AccelerationState::Active && name.starts_with("va") {
-                    Some("VA-API".into())
-                } else {
-                    None
-                },
+                api: hardware_api(name).map(Into::into),
                 reason: (state == AccelerationState::Unknown)
                     .then(|| "Unrecognized decoder factory".into()),
                 state,
@@ -129,6 +151,15 @@ pub fn playback_from_diagnostics(text: &str) -> Vec<AccelerationRecord> {
             state: AccelerationState::Active,
             implementation: Some("DMA-BUF".into()),
             api: Some("DMA-BUF".into()),
+            device: None,
+            reason: None,
+        }
+    } else if text.contains("\"webkitglvideosink\"") {
+        AccelerationRecord {
+            component: "playback_render".into(),
+            state: AccelerationState::Active,
+            implementation: Some("OpenGL (webkitglvideosink)".into()),
+            api: Some("OpenGL".into()),
             device: None,
             reason: None,
         }
@@ -165,13 +196,62 @@ mod tests {
     fn decoder_classification_is_conservative() {
         assert_eq!(classify_decoder("vah264dec"), AccelerationState::Active);
         assert_eq!(classify_decoder("avdec_h264"), AccelerationState::Software);
-        assert_eq!(classify_decoder("futuredec"), AccelerationState::Unknown)
+        assert_eq!(classify_decoder("futuredec"), AccelerationState::Unknown);
+        assert_eq!(classify_decoder("nvh265sldec"), AccelerationState::Active);
+        assert_eq!(classify_decoder("vaapih264dec"), AccelerationState::Active);
+        assert_eq!(
+            classify_decoder("varenderDh264dec"),
+            AccelerationState::Unknown
+        )
+    }
+    fn created(names: &[&str]) -> String {
+        names
+            .iter()
+            .map(|n| format!("INFO GST_ELEMENT_FACTORY creating element \"{n}\" named \"{n}0\"\n"))
+            .collect()
+    }
+    #[test]
+    fn nvdec_is_active_without_device() {
+        let r = playback_from_diagnostics(&created(&["nvh264dec"]));
+        assert_eq!(r[0].state, AccelerationState::Active);
+        assert_eq!(r[0].api.as_deref(), Some("NVDEC"));
+        assert_eq!(r[0].device, None);
+        let r = playback_from_diagnostics(&created(&["nvh265sldec"]));
+        assert_eq!(r[0].state, AccelerationState::Active);
+        assert_eq!(r[0].api.as_deref(), Some("NVDEC"))
+    }
+    #[test]
+    fn multi_device_va_decoder_is_detected_and_last_wins() {
+        let r = playback_from_diagnostics(&created(&["varenderD129h264dec"]));
+        assert_eq!(r[0].implementation.as_deref(), Some("varenderD129h264dec"));
+        assert_eq!(r[0].state, AccelerationState::Active);
+        assert_eq!(r[0].api.as_deref(), Some("VA-API"));
+        let r =
+            playback_from_diagnostics(&created(&["vah264dec", "varenderD129h264dec", "avdec_aac"]));
+        assert_eq!(r[0].implementation.as_deref(), Some("varenderD129h264dec"))
+    }
+    #[test]
+    fn render_reports_gl_sink_dmabuf_or_unknown() {
+        let r = playback_from_diagnostics(&created(&["vah264dec", "webkitglvideosink"]));
+        assert_eq!(r[1].state, AccelerationState::Active);
+        assert_eq!(
+            r[1].implementation.as_deref(),
+            Some("OpenGL (webkitglvideosink)")
+        );
+        assert_eq!(r[1].api.as_deref(), Some("OpenGL"));
+        let r = playback_from_diagnostics(&created(&["vah264dec"]));
+        assert_eq!(r[1].state, AccelerationState::Unknown);
+        assert_eq!(
+            r[1].reason.as_deref(),
+            Some("Rendering path has not been observed")
+        )
     }
     #[test]
     fn diagnostics_preserve_factory_and_dmabuf() {
         let r = playback_from_diagnostics("selected vah264dec and dmabuf sink");
         assert_eq!(r[0].implementation.as_deref(), Some("vah264dec"));
-        assert_eq!(r[1].state, AccelerationState::Active)
+        assert_eq!(r[1].state, AccelerationState::Active);
+        assert_eq!(r[1].api.as_deref(), Some("DMA-BUF"))
     }
     #[test]
     fn last_created_decoder_wins_after_fallback() {
