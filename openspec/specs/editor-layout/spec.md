@@ -87,11 +87,15 @@ The editor SHALL, during export, cover the workspace with a blurred modal showin
 - **THEN** the existing cancellation confirmation is shown
 
 ### Requirement: Design tokens and typography
-The editor SHALL use the Nocturne token set (background, surface, text, accent ramp, neutral ramp, divider, radii, shadows) for all colors and shapes, SHALL render text in a bundled Inter font that needs no network access, and SHALL show disabled controls at 45% opacity.
+The editor SHALL use the Nocturne token set, as defined on the Catppuccin Mocha and Latte palettes (background, surface, text, accent ramp, neutral ramp, divider, radii, shadows), for all colors and shapes, SHALL resolve those tokens for the active color theme, SHALL render text in a bundled Inter font that needs no network access, and SHALL show disabled controls at 45% opacity.
 
 #### Scenario: Offline launch
 - **WHEN** the application starts without network access
 - **THEN** the interface renders in Inter with no fallback font substitution
+
+#### Scenario: Tokens resolve per theme
+- **WHEN** the active color theme changes
+- **THEN** every token-colored element, including translucent fills derived from a token, re-renders in that theme's value of the same token
 
 ### Requirement: Token-colored outlines
 Every border that the editor gives a token color (accent, danger, or a neutral step) SHALL render in that exact token color, not in the default divider color. The selected option of a segmented control SHALL show a complete accent outline that follows the control's rounded outer corners.
